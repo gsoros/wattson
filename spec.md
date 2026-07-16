@@ -1,7 +1,7 @@
 ## Wattson — Project Spec
 
 ### Purpose
-Companion Android/iOS app for the OpenRideDash (ORD) e-bike display (ESP32-C3, BLE GATT: CSC, CPS, BAS, DIS, custom CTS, NUS). Connects to a single paired ORD Dash unit to record ride data, display live telemetry, and configure device parameters. Single-user, local-first. Not intended for app store distribution.
+Companion Android/iOS app for the [OpenRideDash](https://github.com/gsoros/open-ride-dash) e-bike display (ESP32-C3, BLE GATT: CSC, CPS, BAS, DIS, custom CTS, NUS). Connects to a single paired ORD Dash unit to record ride data, display live telemetry, and configure device parameters. Single-user, local-first. Not intended for app store distribution.
 
 ### Data source — CTS payload (custom telemetry, notify @ 1Hz, change-gated)
 version, speed (km/h), battery voltage (V), battery current (A), state of charge (%), range (km), PAS level (-1 to 5), human power (W), cadence (RPM)
