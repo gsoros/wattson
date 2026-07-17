@@ -10,7 +10,10 @@ import 'ble_service.dart';
 /// drains slowly, PAS cycles. Useful for building and testing the UI, recording,
 /// and export paths without a physical ORD Dash.
 class MockBleService implements BleService {
-  MockBleService({this.heartRateEnabled = false});
+  MockBleService({this.heartRateEnabled = false}) {
+    // Emit initial disconnected state so the provider has data immediately.
+    _stateController.add(BleConnectionState.disconnected);
+  }
 
   final bool heartRateEnabled;
 

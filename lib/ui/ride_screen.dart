@@ -55,16 +55,15 @@ class RideScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           final service = ref.read(bleServiceProvider);
-          connection.whenData((state) async {
-            if (state == BleConnectionState.connected) {
-              await service.disconnect();
-            } else {
-              await service.connect();
-            }
-          });
+          final state = ref.read(connectionStateProvider).value;
+          if (state == BleConnectionState.connected) {
+            service.disconnect();
+          } else {
+            service.connect();
+          }
         },
-        label: const Text('Connect'),
-        icon: const Icon(Icons.bluetooth),
+        label: Text(ref.watch(connectionStateProvider).value == BleConnectionState.connected ? 'Disconnect' : 'Connect'),
+        icon: Icon(ref.watch(connectionStateProvider).value == BleConnectionState.connected ? Icons.bluetooth_disabled : Icons.bluetooth),
       ),
     );
   }
