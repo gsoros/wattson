@@ -51,6 +51,8 @@ dependencies:
   flutter_riverpod: ^3.3.2
   # Permissions
   permission_handler: ^12.0.3
+  # Persistent key-value storage
+  shared_preferences: ^2.5.0
   # OS share sheet (export)
   share_plus: ^13.2.1
 

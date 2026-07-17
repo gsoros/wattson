@@ -3,89 +3,169 @@ import 'dart:math';
 
 import '../models/telemetry.dart';
 import 'ble_service.dart';
+import 'ble_scan_result.dart';
 
-/// Development BLE service that emits realistic telemetry without hardware.
+/// Development BLE service that simulates two virtual devices without hardware.
 ///
-/// Drives a simulated ride: speed ramps up, cadence/power track speed, battery
-/// drains slowly, PAS cycles. Useful for building and testing the UI, recording,
-/// and export paths without a physical ORD Dash.
+/// Drives a simulated ride and optional HRM for UI/recording/export testing.
 class MockBleService implements BleService {
   MockBleService({this.heartRateEnabled = false}) {
-    // Emit initial disconnected state so the provider has data immediately.
-    _stateController.add(BleConnectionState.disconnected);
+    _dashStateController.add(BleConnectionState.disconnected);
+    _hrmStateController.add(BleConnectionState.disconnected);
   }
 
   final bool heartRateEnabled;
 
-  final _stateController = StreamController<BleConnectionState>.broadcast();
+  final _scanController = StreamController<List<BleScanResult>>.broadcast();
+  final _dashStateController = StreamController<BleConnectionState>.broadcast();
+  final _hrmStateController = StreamController<BleConnectionState>.broadcast();
   final _telemetryController = StreamController<Telemetry>.broadcast();
 
   Timer? _tickTimer;
   int _tick = 0;
-  bool _connected = false;
+  bool _dashConnected = false;
+  bool _hrmConnected = false;
+  bool _scanning = false;
 
   @override
-  Stream<BleConnectionState> get connectionState => _stateController.stream;
+  Stream<List<BleScanResult>> get scanResults => _scanController.stream;
+
+  @override
+  Stream<BleConnectionState> get dashConnectionState => _dashStateController.stream;
+
+  @override
+  Stream<BleConnectionState> get hrmConnectionState => _hrmStateController.stream;
 
   @override
   Stream<Telemetry> get telemetry => _telemetryController.stream;
 
   @override
-  Future<bool> isEnabled() async => true;
+  bool get isScanning => _scanning;
 
   @override
-  Future<void> connect() async {
-    _stateController.add(BleConnectionState.connecting);
+  Future<bool> isEnabled() async => true;
+
+  // -- Scan --
+
+  @override
+  Future<void> startScan() async {
+    _scanning = true;
+    // Emit two mock devices.
+    _scanController.add([
+      BleScanResult(
+        deviceId: '00:11:22:33:44:55',
+        name: 'ord-dev',
+        rssi: -55,
+        appearance: 0x0480, // Cycling Computer
+        isConnected: _dashConnected,
+      ),
+      BleScanResult(
+        deviceId: 'AA:BB:CC:DD:EE:FF',
+        name: 'Polar H10',
+        rssi: -62,
+        appearance: 0x0134, // Heart Rate Monitor
+        isConnected: _hrmConnected,
+      ),
+    ]);
+  }
+
+  @override
+  Future<void> stopScan() async {
+    _scanning = false;
+  }
+
+  // -- Dash --
+
+  @override
+  Future<void> connectToDash(String deviceId) async {
+    _dashStateController.add(BleConnectionState.connecting);
     await Future<void>.delayed(const Duration(milliseconds: 400));
-    _connected = true;
-    _stateController.add(BleConnectionState.connected);
+    _dashConnected = true;
+    _dashStateController.add(BleConnectionState.connected);
+    _ensureTickTimer();
+  }
+
+  @override
+  Future<void> disconnectDash() async {
+    _dashConnected = false;
+    _dashStateController.add(BleConnectionState.disconnected);
+    _maybeStopTimer();
+  }
+
+  // -- HRM --
+
+  @override
+  Future<void> connectToHrm(String deviceId) async {
+    _hrmStateController.add(BleConnectionState.connecting);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    _hrmConnected = true;
+    _hrmStateController.add(BleConnectionState.connected);
+    _ensureTickTimer();
+  }
+
+  @override
+  Future<void> disconnectHrm() async {
+    _hrmConnected = false;
+    _hrmStateController.add(BleConnectionState.disconnected);
+    _maybeStopTimer();
+  }
+
+  void _ensureTickTimer() {
+    if (_tickTimer != null) return;
     _tickTimer = Timer.periodic(const Duration(seconds: 1), _onTick);
   }
 
-  @override
-  Future<void> disconnect() async {
-    _tickTimer?.cancel();
-    _tickTimer = null;
-    _connected = false;
-    _stateController.add(BleConnectionState.disconnected);
+  void _maybeStopTimer() {
+    if (!_dashConnected && !_hrmConnected) {
+      _tickTimer?.cancel();
+      _tickTimer = null;
+    }
   }
 
   void _onTick(Timer _) {
-    if (!_connected) return;
+    if (!_dashConnected && !_hrmConnected) {
+      _maybeStopTimer();
+      return;
+    }
     _tick++;
     final t = _tick.toDouble();
 
-    // Smoothly varying speed between ~12 and ~28 km/h.
-    final speed = 20.0 + 8.0 * sin(t / 20.0);
-    final cadence = (60 + 20 * sin(t / 15.0)).round().clamp(0, 120);
-    final humanPower = (speed * 3.0 + 20 * sin(t / 10.0)).clamp(0, 400).toDouble();
-    final motorPower = (speed * 5.0).clamp(0, 750).toDouble();
-    final soc = (100 - t / 30).clamp(0, 100).round();
-    final voltage = (54.0 - t / 2000).clamp(40, 58).toDouble();
-    final current = (motorPower / voltage).clamp(0, 40).toDouble();
-    final range = (soc / 100.0 * 720 / (motorPower / speed).clamp(0.5, 50)).clamp(0, 200).toDouble();
-    final pas = [0, 1, 2, 3, 4, 5][_tick ~/ 10 % 6];
+    // Simulate CTS data if Dash is connected.
+    if (_dashConnected) {
+      final speed = 20.0 + 8.0 * sin(t / 20.0);
+      final cadence = (60 + 20 * sin(t / 15.0)).round().clamp(0, 120);
+      final humanPower = (speed * 3.0 + 20 * sin(t / 10.0)).clamp(0, 400).toDouble();
+      final motorPower = (speed * 5.0).clamp(0, 750).toDouble();
+      final soc = (100 - t / 30).clamp(0, 100).round();
+      final voltage = (54.0 - t / 2000).clamp(40, 58).toDouble();
+      final current = (motorPower / voltage).clamp(0, 40).toDouble();
+      final range = (soc / 100.0 * 720 / (motorPower / speed).clamp(0.5, 50)).clamp(0, 200).toDouble();
+      final pas = [0, 1, 2, 3, 4, 5][_tick ~/ 10 % 6];
+      final hr = heartRateEnabled || _hrmConnected ? (120 + 10 * sin(t / 8.0)).round() : 0;
 
-    _telemetryController.add(
-      Telemetry(
-        speedKmh: speed,
-        batteryVoltage: voltage,
-        batteryCurrent: current,
-        soc: soc,
-        rangeKm: range,
-        pasLevel: pas,
-        humanPowerW: humanPower,
-        motorPowerW: motorPower,
-        cadenceRpm: cadence,
-        heartRateBpm: heartRateEnabled ? (120 + 10 * sin(t / 8.0)).round() : 0,
-        timestamp: DateTime.now(),
-      ),
-    );
+      _telemetryController.add(
+        Telemetry(
+          speedKmh: speed,
+          batteryVoltage: voltage,
+          batteryCurrent: current,
+          soc: soc,
+          rangeKm: range,
+          pasLevel: pas,
+          humanPowerW: humanPower,
+          motorPowerW: motorPower,
+          cadenceRpm: cadence,
+          heartRateBpm: hr,
+          timestamp: DateTime.now(),
+        ),
+      );
+    } else if (_hrmConnected) {
+      // HRM-only tick: emit HR without full CTS data.
+      _telemetryController.add(Telemetry(heartRateBpm: (120 + 10 * sin(t / 8.0)).round(), timestamp: DateTime.now()));
+    }
   }
 
   @override
   Future<String?> sendCommand(String line) async {
-    // Echo a plausible API reply for the dev console.
     await Future<void>.delayed(const Duration(milliseconds: 50));
     if (line.startsWith('hostname')) return 'ord';
     if (line.startsWith('ble')) return 'enabled: true, connected: true';
@@ -95,13 +175,24 @@ class MockBleService implements BleService {
 
   @override
   Future<void> writeHeartRate(int bpm) async {
-    // No-op in mock; HR is already simulated when enabled.
+    // No-op in mock.
+  }
+
+  @override
+  Future<void> forgetDevice(String deviceId) async {
+    if (_dashConnected && deviceId == '00:11:22:33:44:55') {
+      await disconnectDash();
+    } else if (_hrmConnected && deviceId == 'AA:BB:CC:DD:EE:FF') {
+      await disconnectHrm();
+    }
   }
 
   @override
   Future<void> dispose() async {
     _tickTimer?.cancel();
-    await _stateController.close();
+    await _scanController.close();
+    await _dashStateController.close();
+    await _hrmStateController.close();
     await _telemetryController.close();
   }
 }

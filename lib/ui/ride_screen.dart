@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ble/ble_service.dart';
 import '../providers/ble_provider.dart';
+import 'settings_page.dart';
 
 /// Basic live ride screen (M0/M3 placeholder).
 class RideScreen extends ConsumerWidget {
@@ -10,28 +11,34 @@ class RideScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final connection = ref.watch(connectionStateProvider);
+    final dashState = ref.watch(dashConnectionStateProvider);
     final telemetry = ref.watch(telemetryProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Wattson'),
         actions: [
-          connection.when(
-            data: (state) => Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Chip(
-                label: Text(switch (state) {
-                  BleConnectionState.connected => 'Connected',
-                  BleConnectionState.connecting => 'Connecting…',
-                  BleConnectionState.scanning => 'Scanning…',
-                  BleConnectionState.disabled => 'Disabled',
-                  BleConnectionState.disconnected => 'Disconnected',
-                }),
-              ),
+          // Connection chip
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Chip(
+              label: Text(switch (dashState.value) {
+                BleConnectionState.connected => 'Connected',
+                BleConnectionState.connecting => 'Connecting…',
+                BleConnectionState.scanning => 'Scanning…',
+                BleConnectionState.disabled => 'Disabled',
+                BleConnectionState.disconnected => 'Disconnected',
+                null => '—',
+              }),
             ),
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const Icon(Icons.error),
+          ),
+          // Settings gear icon (replaces old FAB)
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
+            },
           ),
         ],
       ),
@@ -51,19 +58,6 @@ class RideScreen extends ConsumerWidget {
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Telemetry error: $e')),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          final service = ref.read(bleServiceProvider);
-          final state = ref.read(connectionStateProvider).value;
-          if (state == BleConnectionState.connected) {
-            service.disconnect();
-          } else {
-            service.connect();
-          }
-        },
-        label: Text(ref.watch(connectionStateProvider).value == BleConnectionState.connected ? 'Disconnect' : 'Connect'),
-        icon: Icon(ref.watch(connectionStateProvider).value == BleConnectionState.connected ? Icons.bluetooth_disabled : Icons.bluetooth),
       ),
     );
   }
