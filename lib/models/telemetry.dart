@@ -1,10 +1,9 @@
-/// Unified telemetry snapshot from the ORD Dash.
+/// Unified telemetry snapshot.
 ///
-/// Sourced from multiple BLE characteristics:
-///  - CTS (custom telemetry, notify @ ~1 Hz, change-gated): speed, battery
+/// Sourced from two BLE devices:
+///  - ORD: CTS char (custom telemetry, notify @ ~1 Hz, change-gated): speed, battery
 ///    voltage/current, state of charge, range, PAS level, human power, cadence.
-///  - CPS (Cycling Power Service 0x1818 / 0x2A63): motor power.
-///  - CTS HR write char: heart rate (pushed from a connected HRM).
+///  - HRM: heart rate
 class Telemetry {
   const Telemetry({
     this.speedKmh = 0,

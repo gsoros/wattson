@@ -60,6 +60,10 @@ class RealBleService implements BleService {
   final List<int> _nusBuffer = [];
   Completer<String>? _nusCompleter;
 
+  // -- Last known telemetry (for merging HR-only updates) --
+  Telemetry? _lastTelemetry;
+  int _lastHeartRateBpm = 0;
+
   // -- Scan state --
   bool _scanning = false;
   StreamSubscription<List<ScanResult>>? _scanSub;
@@ -314,6 +318,7 @@ class RealBleService implements BleService {
     _dashConnected = true;
     _dashStateController.add(BleConnectionState.connected);
     _updateConnectedFlag(deviceId, true);
+    _updateKnownDevice(deviceId, name: device.advName.isNotEmpty ? device.advName : device.platformName, appearance: 0x0480);
     debugPrint('[RealBle] connectToDash: done');
   }
 
@@ -349,6 +354,8 @@ class RealBleService implements BleService {
     _nusTxChar = null;
     _nusRxChar = null;
     _ctsHrChar = null;
+    _lastTelemetry = null;
+    _lastHeartRateBpm = 0;
     _ctsSub?.cancel();
     _ctsSub = null;
     _nusTxSub?.cancel();
@@ -444,6 +451,7 @@ class RealBleService implements BleService {
     _hrmConnected = true;
     _hrmStateController.add(BleConnectionState.connected);
     _updateConnectedFlag(deviceId, true);
+    _updateKnownDevice(deviceId, name: device.advName.isNotEmpty ? device.advName : device.platformName, appearance: 0x0134);
     debugPrint('[RealBle] connectToHrm: done');
   }
 
@@ -618,6 +626,15 @@ class RealBleService implements BleService {
     return true;
   }
 
+  /// Update the cache entry for a device with known name and appearance.
+  void _updateKnownDevice(String deviceId, {String? name, int? appearance}) {
+    final existing = _knownDevices[deviceId];
+    if (existing != null) {
+      _knownDevices[deviceId] = existing.copyWith(name: name ?? existing.name, appearance: appearance ?? existing.appearance);
+      _scanController.add(_knownDevices.values.toList());
+    }
+  }
+
   /// Update the [isConnected] flag on a known device and re-emit the scan list.
   void _updateConnectedFlag(String? deviceId, bool connected) {
     if (deviceId == null) return;
@@ -632,7 +649,10 @@ class RealBleService implements BleService {
     try {
       final telemetry = CtsParser.parse(value, timestamp: DateTime.now());
       final motorPower = telemetry.batteryVoltage * telemetry.batteryCurrent;
-      _telemetryController.add(telemetry.copyWith(motorPowerW: motorPower));
+      // Preserve the last known HR so CTS updates don't clobber it.
+      final result = telemetry.copyWith(motorPowerW: motorPower, heartRateBpm: _lastHeartRateBpm);
+      _lastTelemetry = result;
+      _telemetryController.add(result);
     } on CtsParseException {
       // Ignore malformed payloads.
     } on CtsVersionException {
@@ -675,8 +695,14 @@ class RealBleService implements BleService {
     }
 
     // Update the telemetry stream with HR value.
-    // We don't have a full CTS sample, so just emit a Telemetry with HR set.
-    _telemetryController.add(Telemetry(heartRateBpm: bpm, timestamp: DateTime.now()));
+    // Merge into the last known CTS sample so we don't overwrite real values with zeros.
+    _lastHeartRateBpm = bpm;
+    final last = _lastTelemetry;
+    if (last != null) {
+      _telemetryController.add(last.copyWith(heartRateBpm: bpm, timestamp: DateTime.now()));
+    } else {
+      _telemetryController.add(Telemetry(heartRateBpm: bpm, timestamp: DateTime.now()));
+    }
 
     // Forward to Dash's CTS HR char if connected.
     writeHeartRate(bpm);
