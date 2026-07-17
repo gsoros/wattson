@@ -142,6 +142,13 @@ class RealBleService implements BleService {
       await ctsChar.setNotifyValue(true);
       _ctsSub?.cancel();
       _ctsSub = ctsChar.onValueReceived.listen(_onCtsValue);
+      // Read the current value so the UI shows metrics immediately.
+      try {
+        final initial = await ctsChar.read();
+        if (initial.isNotEmpty) _onCtsValue(initial);
+      } catch (e) {
+        debugPrint('[RealBle] CTS initial read failed: $e');
+      }
     } else {
       debugPrint('[RealBle] WARNING: CTS telemetry char not found');
     }

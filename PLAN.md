@@ -50,6 +50,8 @@ Single-user, local-first. Not for app-store distribution.
   passkey shown on the Dash (`BLE_HS_IO_DISPLAY_ONLY`). Persist bonded device;
   auto-reconnect on launch/drop.
 - On connect: discover services, subscribe to **CTS notify** + **NUS TX notify**.
+  CTS char also has READ so the app reads the current value immediately after
+  subscribing, giving the user instant feedback without waiting for a change.
 - API replies may be longer than default notify max payload. 
   Research origin of limit (MTU - packet overhead or fixed size in GATT spec?).
   Possible solutions:
