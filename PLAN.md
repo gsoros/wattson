@@ -7,22 +7,22 @@ Single-user, local-first. Not for app-store distribution.
 
 ```
 ┌─────────────────────────────────────────────┐
-│  UI (Material 3, Riverpod)                   │  ride screen, history, config, BLE status
+│  UI (Material 3, Riverpod)                  │  ride screen, history, config, BLE status
 ├─────────────────────────────────────────────┤
-│  Providers (Riverpod)                         │  connection, telemetry stream, recording session
+│  Providers (Riverpod)                       │  connection, telemetry stream, recording session
 ├─────────────────────────────────────────────┤
-│  Repository (Drift / SQLite WAL)              │  rides + samples, append-only
+│  Repository (Drift / SQLite WAL)            │  rides + samples, append-only
 ├─────────────────────────────────────────────┤
-│  BleService (abstract interface)              │  connect/scan/notify/subscribe
-│   ├─ RealBleService (flutter_blue_plus)       │
-│   └─ MockBleService (dev/simulator)           │  emits CTS/CPS/CSC/BAS/HR without hardware
+│  BleService (abstract interface)            │  connect/scan/notify/subscribe
+│   ├─ RealBleService (flutter_blue_plus)     │
+│   └─ MockBleService (dev/simulator)         │  emits CTS/CPS/CSC/BAS/HR without hardware
 └─────────────────────────────────────────────┘
 ```
 
 `BleService` is an abstract class so `MockBleService` can drive the whole app
 (UI, recording, export) without a Dash unit.
 
-## Firmware work (in scope — must land before Features 2 & 6)
+## Firmware work (in scope — must land before Features 2 & 6) DONE
 
 1. **Add NUS service** (`src/tasks/ble.cpp`): Nordic UART `RX` (write, 250-byte
    cap) + `TX` (read/notify). Bridge RX lines to the existing `Api::queueCommand`
@@ -34,7 +34,7 @@ Single-user, local-first. Not for app-store distribution.
    display already has `METRIC_HEART_RATE` reserved). Unblocks Feature 2's
    push-to-Dash.
 
-## Phase 0 — Project scaffold
+## Phase 0 — Project scaffold DONE
 
 - `flutter create` (Android 15+ min, iOS best-effort), Material 3, Riverpod.
 - `pubspec`: `flutter_blue_plus`, `geolocator`, `flutter_foreground_task`,
@@ -43,13 +43,16 @@ Single-user, local-first. Not for app-store distribution.
 
 ## Phase 1 — BLE connection & pairing (Feature 1)
 
-- `BleService.scan()` filters by **hostname** (CTS 128-bit UUID isn't advertised;
-  advertising carries only CSC+CPS + name). Match `state.hostname()` (default
-  `ORD Dash`).
+- `BleService.scan()` lists all visible devices (CTS 128-bit UUID isn't advertised;
+  advertising carries only CSC+CPS + name). Devices with appearance `0x0484` should 
+  be highlighted and/or on at top of the scan result list.
 - Bonding: implement `passkeyRequired` callback — **phone enters** the 6-digit
   passkey shown on the Dash (`BLE_HS_IO_DISPLAY_ONLY`). Persist bonded device;
   auto-reconnect on launch/drop.
 - On connect: discover services, subscribe to **CTS notify** + **NUS TX notify**.
+- API replies may be longer than default notify max payload. Read TX char on 
+  notify if message == limit, or negotiate larger MTU? NUS will be used 
+  infrequently, small MTU would be preferable for efficiency.
 - Connection status UI: enabled / disabled / searching / connected / lost.
 
 ## Phase 2 — Telemetry parsing (the exact contract)
@@ -70,8 +73,8 @@ Single-user, local-first. Not for app-store distribution.
 
 - Forward-compat: ignore trailing bytes if `payload.length > 14`; reject/flag
   unknown `version`.
-- **Motor power** comes from **CPS** `0x2A63` (uint16 instantaneous power,
-  change-gated) — not CTS.
+- **Motor power** is calculated from **CTS** voltage * current, 
+  no need to use **CPS**
 - **Battery %** authoritative source = CTS SoC (BAS `_batteryLevel` starts at 0;
   ignore it).
 - Unified `Telemetry` model: `{speed, battV, battI, soc, range, pas,
@@ -95,19 +98,19 @@ Single-user, local-first. Not for app-store distribution.
 - Start/stop/pause session. `flutter_foreground_task` holds wake-lock +
   persistent notification (Android 14 `location` type) while the **main isolate**
   keeps the `flutter_blue_plus` connection (per decision).
-- `geolocator` GPS stream + permission handling; `elevation` = GPS altitude.
+- `geolocator` GPS stream + permission handling; `elevation gain` = GPS altitude 
+  gain (climbing a 100m tall hill 3 times = 300m gain).
 - Drift append-only `samples` (1 row / CTS tick). GPS joined by nearest-timestamp
-  interpolation into the same row (or a separate `gps_points` table if cleaner —
-  recommend interpolation into `samples`).
+  interpolation into the same row.
 - `rides` summary computed at stop.
 
 ## Phase 6 — Data layer (Drift schema, refined)
 
 ```sql
 rides(id PK, start_time, end_time, time_in_motion, distance,
-      elevation, avg_human_power, max_human_power, avg_motor_power,
+      elevation_gain, avg_human_power, max_human_power, avg_motor_power,
       avg_cadence, avg_hr, assist_ratio, notes)
-samples(ride_id FK INDEX, ts, lat, lon, speed, human_power, motor_power,
+samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_power,
         cadence, pas_level, hr, battery_v, battery_a, soc, range)
 ```
 
