@@ -1,15 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ble/ble_service.dart';
-import '../ble/mock_ble_service.dart';
+import '../ble/real_ble_service.dart';
 import '../models/telemetry.dart';
 
 /// Provides the active [BleService].
 ///
-/// M0 uses [MockBleService] so the app runs without hardware. Swap for
-/// [RealBleService] (flutter_blue_plus) in M1.
+/// M1 uses [RealBleService] for live hardware. Swap for [MockBleService] in
+/// tests or development without a Dash unit.
 final bleServiceProvider = Provider<BleService>((ref) {
-  final service = MockBleService(heartRateEnabled: true);
+  final service = RealBleService();
   ref.onDispose(service.dispose);
   return service;
 });

@@ -41,7 +41,7 @@ Single-user, local-first. Not for app-store distribution.
   `drift` + `drift_dev`, `riverpod`, `permission_handler`, `share_plus`.
 - Folder layout: `lib/{ble,data,providers,ui,export,models}/`.
 
-## Phase 1 — BLE connection & pairing (Feature 1)
+## Phase 1 — BLE connection & pairing (Feature 1) DONE
 
 - `BleService.scan()` lists **all visible** devices (CTS 128-bit UUID isn't advertised;
   advertising carries only CSC+CPS + name). Devices with appearance `0x0480` should 
@@ -172,8 +172,8 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 
 | M | Deliverable |
 |---|---|
-| M0 | Scaffold + `BleService` interface + `MockBleService` |
-| M1 | BLE connect/pair/subscribe + CTS parser (live values) |
+| M0 | Scaffold + `BleService` interface + `MockBleService` | **DONE** |
+| M1 | BLE connect/pair/subscribe + CTS parser (live values) | **DONE** |
 | M2 | HRM + CPS motor power + live screen |
 | M3 | Recording + Drift + foreground service |
 | M4 | GPX/CSV export |
