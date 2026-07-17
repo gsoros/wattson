@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wattson/ble/cts_parser.dart';
 
-// Helper: build a 14-byte big-endian CTS payload (matching firmware byte order).
+// Helper: build a 14-byte little-endian CTS payload.
 List<int> buildPayload({
   int version = 0x01,
   int speed = 2000, // 20.00 km/h
@@ -15,18 +15,18 @@ List<int> buildPayload({
 }) {
   final b = List<int>.filled(14, 0, growable: true);
   b[0] = version;
-  b[1] = (speed >> 8) & 0xFF; // MSB
-  b[2] = speed & 0xFF; // LSB
-  b[3] = (voltage >> 8) & 0xFF;
-  b[4] = voltage & 0xFF;
-  b[5] = (current >> 8) & 0xFF;
-  b[6] = current & 0xFF;
+  b[1] = speed & 0xFF; // LSB
+  b[2] = (speed >> 8) & 0xFF; // MSB
+  b[3] = voltage & 0xFF;
+  b[4] = (voltage >> 8) & 0xFF;
+  b[5] = current & 0xFF;
+  b[6] = (current >> 8) & 0xFF;
   b[7] = soc;
-  b[8] = (range >> 8) & 0xFF;
-  b[9] = range & 0xFF;
+  b[8] = range & 0xFF;
+  b[9] = (range >> 8) & 0xFF;
   b[10] = pas;
-  b[11] = (humanPower >> 8) & 0xFF;
-  b[12] = humanPower & 0xFF;
+  b[11] = humanPower & 0xFF;
+  b[12] = (humanPower >> 8) & 0xFF;
   b[13] = cadence;
   return b;
 }

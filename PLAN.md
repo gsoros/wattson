@@ -77,7 +77,7 @@ Single-user, local-first. Not for app-store distribution.
 
 ## Phase 2 — Telemetry parsing (the exact contract)
 
-`CtsParser` decodes the **14-byte big-endian** payload (`version` byte `0x01`):
+`CtsParser` decodes the **14-byte little-endian** payload (`version` byte `0x01`):
 
 | byte | field | type |
 |---|---|---|

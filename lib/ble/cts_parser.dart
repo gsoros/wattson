@@ -2,15 +2,15 @@ import '../models/telemetry.dart';
 
 /// Decodes the ORD Dash CTS (custom telemetry service) payload.
 ///
-/// Fixed 14-byte big-endian payload, version 1:
+/// Fixed 14-byte little-endian payload, version 1:
 ///   byte  0    : version (0x01)
-///   bytes 1-2  : speed, km/h * 100 (uint16, big-endian)
-///   bytes 3-4  : battery voltage, V * 100 (uint16, big-endian)
-///   bytes 5-6  : battery current, A * 100 (uint16, big-endian, unsigned)
+///   bytes 1-2  : speed, km/h * 100 (uint16, little-endian)
+///   bytes 3-4  : battery voltage, V * 100 (uint16, little-endian)
+///   bytes 5-6  : battery current, A * 100 (uint16, little-endian, unsigned)
 ///   byte  7    : state of charge, % (uint8)
-///   bytes 8-9  : range, km * 100 (uint16, big-endian)
+///   bytes 8-9  : range, km * 100 (uint16, little-endian)
 ///   byte  10   : PAS level (int8: -1 walk, 0 off, 1-5)
-///   bytes 11-12: human power, W * 10 (uint16, big-endian)
+///   bytes 11-12: human power, W * 10 (uint16, little-endian)
 ///   byte  13   : cadence, RPM (uint8)
 ///
 /// Forward-compatible: trailing bytes beyond 14 are ignored; unknown versions
@@ -59,8 +59,8 @@ class CtsParser {
   }
 
   static int _readUint16(List<int> b, int offset) {
-    // Firmware writes big-endian (MSB at offset, LSB at offset+1).
-    return (b[offset] << 8) | b[offset + 1];
+    // Little-endian: LSB at offset, MSB at offset+1.
+    return b[offset] | (b[offset + 1] << 8);
   }
 }
 
