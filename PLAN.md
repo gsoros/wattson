@@ -63,6 +63,16 @@ Single-user, local-first. Not for app-store distribution.
   (Api::registerCommand(uint8_t uniqueId, const char *uniqueName, Callback handler, const char *helpText)).
   NUS will be used infrequently: small MTU would be preferable for efficiency. Text
   interface is human-readable, simple and easy to debug.
+
+  **Decision (2026-07-17):** Negotiate MTU 247 and fragment over NOTIFY; the TX
+  char has no READ property. The first frame carries a 2-byte big-endian total-length
+  prefix; subsequent frames are raw continuation data (no per-frame prefix — the
+  phone knows when to stop by accumulating `total` bytes). Notifications are delivered
+  in order by the stack, so there is no shared-buffer clobber race (which a
+  READ/Read-Blob approach would introduce). Replies longer than one MTU (e.g. `help`)
+  are split across notifications; if parsing help over BLE becomes necessary, the
+  help handler will emit multiple chunked replies (e.g. `help line 2`). Upgrade path
+  to INDICATION if a dropped notification ever stalls reassembly.
 - Connection status UI: enabled / disabled / searching / connected / lost.
 
 ## Phase 2 — Telemetry parsing (the exact contract)
