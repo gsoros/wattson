@@ -53,12 +53,31 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           if (devices.isEmpty) {
             return const Center(child: Text('No devices found.'));
           }
+          // Sort: connected first, then by lastSeen (desc), then by name.
+          final sorted = devices.toList()
+            ..sort((a, b) {
+              // Connected devices always on top.
+              if (a.isConnected != b.isConnected) {
+                return a.isConnected ? -1 : 1;
+              }
+              // Then by lastSeen (most recent first).
+              if (a.lastSeen != null && b.lastSeen != null) {
+                final cmp = b.lastSeen!.compareTo(a.lastSeen!);
+                if (cmp != 0) return cmp;
+              } else if (a.lastSeen != null) {
+                return -1;
+              } else if (b.lastSeen != null) {
+                return 1;
+              }
+              // Finally by name.
+              return a.name.compareTo(b.name);
+            });
           return ListView.separated(
             padding: const EdgeInsets.all(8),
-            itemCount: devices.length,
+            itemCount: sorted.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
-              return _DeviceTile(device: devices[index]);
+              return _DeviceTile(device: sorted[index]);
             },
           );
         },
@@ -82,7 +101,7 @@ class _DeviceTile extends ConsumerWidget {
 
     final isConnected = device.isConnected;
     final isCyclingComputer = device.appearance == 0x0480;
-    final isHrm = device.appearance == 0x0134;
+    final isHrm = device.serviceUuids.any((u) => u.startsWith('180d')) || device.appearance == 0x0134;
     final dashConnected = dashState == BleConnectionState.connected;
     final hrmConnected = hrmState == BleConnectionState.connected;
 

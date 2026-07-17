@@ -163,6 +163,7 @@ class RealBleService implements BleService {
     }
 
     // Merge fresh scan results into the cache.
+    final now = DateTime.now();
     for (final r in results) {
       final id = r.device.remoteId.str;
       final name = r.device.advName.isNotEmpty ? r.device.advName : r.device.platformName;
@@ -173,6 +174,8 @@ class RealBleService implements BleService {
         appearance: r.advertisementData.appearance ?? 0,
         isConnected: connectedIds.contains(id),
         inRange: true,
+        lastSeen: now,
+        serviceUuids: r.advertisementData.serviceUuids.map((g) => g.str).toList(),
       );
     }
 

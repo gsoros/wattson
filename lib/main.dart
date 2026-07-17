@@ -19,6 +19,11 @@ class WattsonApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Wattson',
       theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: Colors.green)),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green, brightness: Brightness.dark),
+      ),
+      themeMode: ThemeMode.system,
       home: const RideScreen(),
     );
   }

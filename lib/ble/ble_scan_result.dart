@@ -1,6 +1,15 @@
 /// A discovered BLE device shown in the scan results list.
 class BleScanResult {
-  const BleScanResult({required this.deviceId, required this.name, this.rssi, this.appearance = 0, this.isConnected = false, this.inRange = true});
+  const BleScanResult({
+    required this.deviceId,
+    required this.name,
+    this.rssi,
+    this.appearance = 0,
+    this.isConnected = false,
+    this.inRange = true,
+    this.lastSeen,
+    this.serviceUuids = const [],
+  });
 
   /// Bluetooth MAC / remote ID.
   final String deviceId;
@@ -21,7 +30,22 @@ class BleScanResult {
   /// False for stored-but-out-of-range devices.
   final bool inRange;
 
-  BleScanResult copyWith({String? deviceId, String? name, int? rssi, int? appearance, bool? isConnected, bool? inRange}) {
+  /// When this device was last seen in a scan (null = never seen, just stored).
+  final DateTime? lastSeen;
+
+  /// Advertised service UUIDs (as 16/32/128-bit hex strings, e.g. "0000180d-...").
+  final List<String> serviceUuids;
+
+  BleScanResult copyWith({
+    String? deviceId,
+    String? name,
+    int? rssi,
+    int? appearance,
+    bool? isConnected,
+    bool? inRange,
+    DateTime? lastSeen,
+    List<String>? serviceUuids,
+  }) {
     return BleScanResult(
       deviceId: deviceId ?? this.deviceId,
       name: name ?? this.name,
@@ -29,6 +53,8 @@ class BleScanResult {
       appearance: appearance ?? this.appearance,
       isConnected: isConnected ?? this.isConnected,
       inRange: inRange ?? this.inRange,
+      lastSeen: lastSeen ?? this.lastSeen,
+      serviceUuids: serviceUuids ?? this.serviceUuids,
     );
   }
 }

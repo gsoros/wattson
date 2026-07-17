@@ -50,21 +50,17 @@ class MockBleService implements BleService {
   @override
   Future<void> startScan() async {
     _scanning = true;
-    // Emit two mock devices.
+    final now = DateTime.now();
     _scanController.add([
-      BleScanResult(
-        deviceId: '00:11:22:33:44:55',
-        name: 'ord-dev',
-        rssi: -55,
-        appearance: 0x0480, // Cycling Computer
-        isConnected: _dashConnected,
-      ),
+      BleScanResult(deviceId: '00:11:22:33:44:55', name: 'ord-dev', rssi: -55, appearance: 0x0480, isConnected: _dashConnected, lastSeen: now),
       BleScanResult(
         deviceId: 'AA:BB:CC:DD:EE:FF',
         name: 'Polar H10',
         rssi: -62,
-        appearance: 0x0134, // Heart Rate Monitor
+        appearance: 0x0134,
         isConnected: _hrmConnected,
+        lastSeen: now,
+        serviceUuids: ['0000180d-0000-1000-8000-00805f9b34fb'],
       ),
     ]);
   }
