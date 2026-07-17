@@ -43,16 +43,26 @@ Single-user, local-first. Not for app-store distribution.
 
 ## Phase 1 — BLE connection & pairing (Feature 1)
 
-- `BleService.scan()` lists all visible devices (CTS 128-bit UUID isn't advertised;
-  advertising carries only CSC+CPS + name). Devices with appearance `0x0484` should 
-  be highlighted and/or on at top of the scan result list.
+- `BleService.scan()` lists **all visible** devices (CTS 128-bit UUID isn't advertised;
+  advertising carries only CSC+CPS + name). Devices with appearance `0x0480` should 
+  be highlighted and/or appear at top of the scan result list.
 - Bonding: implement `passkeyRequired` callback — **phone enters** the 6-digit
   passkey shown on the Dash (`BLE_HS_IO_DISPLAY_ONLY`). Persist bonded device;
   auto-reconnect on launch/drop.
 - On connect: discover services, subscribe to **CTS notify** + **NUS TX notify**.
-- API replies may be longer than default notify max payload. Read TX char on 
-  notify if message == limit, or negotiate larger MTU? NUS will be used 
-  infrequently, small MTU would be preferable for efficiency.
+- API replies may be longer than default notify max payload. 
+  Research origin of limit (MTU - packet overhead or fixed size in GATT spec?).
+  Possible solutions:
+  - Read TX char on notify if message == limit indicating possible truncated data.
+    Read op within callback context is possibly tricky.
+  - Prepend length to reply: e.g. "[size][cmd args][resultCode] reply" "[27][hostname][0] ord-dev".
+    Length would be defined as strlen(msg) before prepending the length and the brackets.
+  - Negotiate larger MTU.
+  - Keep text interface but implement proper fragmentation. Complex.
+  - Define and implement a binary protocol. Complex: would need to enumerate all commands 
+  (Api::registerCommand(uint8_t uniqueId, const char *uniqueName, Callback handler, const char *helpText)).
+  NUS will be used infrequently: small MTU would be preferable for efficiency. Text
+  interface is human-readable, simple and easy to debug.
 - Connection status UI: enabled / disabled / searching / connected / lost.
 
 ## Phase 2 — Telemetry parsing (the exact contract)
@@ -73,7 +83,7 @@ Single-user, local-first. Not for app-store distribution.
 
 - Forward-compat: ignore trailing bytes if `payload.length > 14`; reject/flag
   unknown `version`.
-- **Motor power** is calculated from **CTS** voltage * current, 
+- **Motor power** is derived from **CTS** voltage * current, 
   no need to use **CPS**
 - **Battery %** authoritative source = CTS SoC (BAS `_batteryLevel` starts at 0;
   ignore it).
