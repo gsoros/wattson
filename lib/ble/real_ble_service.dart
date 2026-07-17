@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models/telemetry.dart';
 import 'ble_service.dart';
@@ -12,9 +14,9 @@ import 'cts_parser.dart';
 /// notifications, and bridges NUS command/reply. Bonding is handled by the OS
 /// (system dialog for passkey entry).
 class RealBleService implements BleService {
-  RealBleService({this.dashName = 'ORD Dash', this.scanTimeout = const Duration(seconds: 10)});
+  RealBleService({this.dashName = 'ord-dev', this.scanTimeout = const Duration(seconds: 10)});
 
-  /// The expected hostname of the ORD Dash (default "ORD Dash").
+  /// The expected hostname of the ORD Dash (default "ord-dev").
   final String dashName;
 
   /// How long to scan before giving up.
@@ -35,7 +37,7 @@ class RealBleService implements BleService {
   final List<int> _nusBuffer = [];
   Completer<String>? _nusCompleter;
 
-  StreamSubscription<BluetoothConnectionState>? _connStateSub;
+  StreamSubscription<OnConnectionStateChangedEvent>? _connStateEventSub;
   StreamSubscription<List<int>>? _ctsSub;
   bool _disposed = false;
 
@@ -54,20 +56,26 @@ class RealBleService implements BleService {
   Future<void> connect() async {
     if (_disposed) return;
     _stateController.add(BleConnectionState.scanning);
+    debugPrint('[RealBle] connect: scanning for "$dashName"...');
 
     // 1. Start scan and find our device.
     final device = await _findDevice();
     if (device == null) {
+      debugPrint('[RealBle] connect: device not found');
       _stateController.add(BleConnectionState.disconnected);
       return;
     }
     _device = device;
     _stateController.add(BleConnectionState.connecting);
+    debugPrint('[RealBle] connect: found device ${device.remoteId}');
 
-    // 2. Listen for connection state changes.
-    _connStateSub?.cancel();
-    _connStateSub = device.connectionState.listen((state) {
-      if (state == BluetoothConnectionState.disconnected) {
+    // 2. Listen for disconnection events.
+    // Use the global event stream to avoid the initial-state emission that
+    // device.connectionState sends on first listen.
+    _connStateEventSub?.cancel();
+    _connStateEventSub = FlutterBluePlus.events.onConnectionStateChanged.listen((event) {
+      if (event.device.remoteId == device.remoteId && event.connectionState == BluetoothConnectionState.disconnected) {
+        debugPrint('[RealBle] disconnected event');
         _stateController.add(BleConnectionState.disconnected);
         _onDisconnected();
       }
@@ -75,11 +83,14 @@ class RealBleService implements BleService {
 
     // 3. Connect.
     try {
+      debugPrint('[RealBle] connect: calling device.connect()...');
       await device.connect(
         license: License.nonprofit,
         mtu: 247, // matches firmware negotiation
       );
+      debugPrint('[RealBle] connect: connected');
     } catch (e) {
+      debugPrint('[RealBle] connect failed: $e');
       _stateController.add(BleConnectionState.disconnected);
       return;
     }
@@ -87,8 +98,11 @@ class RealBleService implements BleService {
     // 4. Discover services.
     List<BluetoothService> services;
     try {
+      debugPrint('[RealBle] discovering services...');
       services = await device.discoverServices();
+      debugPrint('[RealBle] found ${services.length} services');
     } catch (e) {
+      debugPrint('[RealBle] discoverServices failed: $e');
       await device.disconnect();
       _stateController.add(BleConnectionState.disconnected);
       return;
@@ -96,9 +110,11 @@ class RealBleService implements BleService {
 
     // 5. Find our characteristics.
     for (final s in services) {
+      debugPrint('[RealBle]   service: ${s.uuid}');
       // CTS: f6333d96-74c0-462d-b92d-5750a2283429
       if (s.uuid == Guid('f6333d96-74c0-462d-b92d-5750a2283429')) {
         for (final c in s.characteristics) {
+          debugPrint('[RealBle]     CTS char: ${c.uuid}');
           if (c.uuid == Guid('5ee460d2-75a3-41ac-9034-2b2d435bb549')) {
             _ctsTelemetryChar = c;
           } else if (c.uuid == Guid('a2c4f7b1-0e3d-4a8c-9b6e-1f2c3d4e5f60')) {
@@ -109,6 +125,7 @@ class RealBleService implements BleService {
       // NUS: 6e400001-b5a3-f393-e0a9-e50e24dcca9e
       if (s.uuid == Guid('6e400001-b5a3-f393-e0a9-e50e24dcca9e')) {
         for (final c in s.characteristics) {
+          debugPrint('[RealBle]     NUS char: ${c.uuid}');
           if (c.uuid == Guid('6e400002-b5a3-f393-e0a9-e50e24dcca9e')) {
             _nusRxChar = c;
           } else if (c.uuid == Guid('6e400003-b5a3-f393-e0a9-e50e24dcca9e')) {
@@ -121,19 +138,26 @@ class RealBleService implements BleService {
     // 6. Subscribe to CTS telemetry notifications.
     final ctsChar = _ctsTelemetryChar;
     if (ctsChar != null) {
+      debugPrint('[RealBle] subscribing to CTS notify...');
       await ctsChar.setNotifyValue(true);
       _ctsSub?.cancel();
       _ctsSub = ctsChar.onValueReceived.listen(_onCtsValue);
+    } else {
+      debugPrint('[RealBle] WARNING: CTS telemetry char not found');
     }
 
     // 7. Subscribe to NUS TX notifications for reply reassembly.
     final nusTx = _nusTxChar;
     if (nusTx != null) {
+      debugPrint('[RealBle] subscribing to NUS TX notify...');
       await nusTx.setNotifyValue(true);
       _nusTxSub?.cancel();
       _nusTxSub = nusTx.onValueReceived.listen(_onNusTxValue);
+    } else {
+      debugPrint('[RealBle] WARNING: NUS TX char not found');
     }
 
+    debugPrint('[RealBle] connect: done');
     _stateController.add(BleConnectionState.connected);
   }
 
@@ -150,8 +174,8 @@ class RealBleService implements BleService {
     _ctsSub = null;
     _nusTxSub?.cancel();
     _nusTxSub = null;
-    _connStateSub?.cancel();
-    _connStateSub = null;
+    _connStateEventSub?.cancel();
+    _connStateEventSub = null;
 
     _nusCompleter?.completeError('disconnected');
     _nusCompleter = null;
@@ -208,41 +232,92 @@ class RealBleService implements BleService {
   // ---- Private helpers ----
 
   Future<BluetoothDevice?> _findDevice() async {
-    // Check if adapter is on.
-    if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
+    // 1. Request runtime permissions (Android 12+ needs BLUETOOTH_SCAN + CONNECT,
+    //    older needs ACCESS_FINE_LOCATION).
+    if (!await _requestBlePermissions()) {
+      debugPrint('[RealBle] _findDevice: permissions not granted');
       return null;
     }
 
+    // 2. Wait for the adapter to be ready.
+    if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
+      debugPrint('[RealBle] _findDevice: waiting for adapter to be on...');
+      try {
+        await FlutterBluePlus.adapterState.where((s) => s == BluetoothAdapterState.on).first.timeout(const Duration(seconds: 30));
+      } catch (_) {
+        debugPrint('[RealBle] _findDevice: adapter never became ready');
+        return null;
+      }
+    }
+    debugPrint('[RealBle] _findDevice: adapter is on');
+
+    // 3. Subscribe to scan results BEFORE starting the scan.
+    debugPrint('[RealBle] _findDevice: scanning for "$dashName"...');
+
+    // Subscribe before startScan to avoid the race vs first result.
     final completer = Completer<BluetoothDevice?>();
     final sub = FlutterBluePlus.scanResults.listen((results) {
       for (final r in results) {
-        // Match by name (advertised name or platform name).
         final name = r.device.advName.isNotEmpty ? r.device.advName : r.device.platformName;
-        if (name == dashName) {
-          completer.complete(r.device);
-          return;
-        }
-        // Also match by appearance 0x0480 (Cycling Computer).
         final appearance = r.advertisementData.appearance;
-        if (appearance == 0x0480) {
-          completer.complete(r.device);
+        debugPrint('[RealBle]   scan result: "$name" appearance=$appearance');
+        if (name == dashName || appearance == 0x0480) {
+          debugPrint('[RealBle]   -> MATCH');
+          if (!completer.isCompleted) completer.complete(r.device);
           return;
         }
       }
     });
 
+    // 4. Start the scan.
     try {
-      await FlutterBluePlus.startScan(withNames: [dashName], timeout: scanTimeout);
-      final device = await completer.future;
+      await FlutterBluePlus.startScan(timeout: scanTimeout);
+      final device = await completer.future.timeout(scanTimeout + const Duration(seconds: 2), onTimeout: () => null);
+      if (device != null) {
+        debugPrint('[RealBle]   -> MATCH: ${device.remoteId}');
+      } else {
+        debugPrint('[RealBle]   -> no match found');
+      }
       return device;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[RealBle] _findDevice error: $e');
       return null;
     } finally {
       await sub.cancel();
+      if (!completer.isCompleted) completer.complete(null);
       try {
         await FlutterBluePlus.stopScan();
       } catch (_) {}
     }
+  }
+
+  /// Request BLE runtime permissions. Returns true if sufficient permissions
+  /// are granted for scanning.
+  Future<bool> _requestBlePermissions() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return true;
+
+    // Android 12+ (API 31+): BLUETOOTH_SCAN + BLUETOOTH_CONNECT are sufficient.
+    // Always request them — the dialog won't show if already granted.
+    debugPrint('[RealBle] requesting BLUETOOTH_SCAN + BLUETOOTH_CONNECT...');
+    final bleResult = await [Permission.bluetoothScan, Permission.bluetoothConnect].request();
+    final bleGranted = bleResult[Permission.bluetoothScan]?.isGranted == true && bleResult[Permission.bluetoothConnect]?.isGranted == true;
+    if (!bleGranted) {
+      debugPrint('[RealBle] BLUETOOTH_SCAN/CONNECT not granted');
+      return false;
+    }
+
+    // Android <12: location permission is required for BLE scan.
+    // On Android 12+ it's optional (some devices need it, some don't).
+    if (await Permission.locationWhenInUse.status.isDenied == true) {
+      debugPrint('[RealBle] requesting location permission...');
+      final locResult = await Permission.locationWhenInUse.request();
+      if (locResult.isGranted != true) {
+        debugPrint('[RealBle] location not granted — BLE scan may still work');
+        // Don't return false; BLE permissions alone may suffice on 12+.
+      }
+    }
+
+    return true;
   }
 
   void _onCtsValue(List<int> value) {
@@ -292,8 +367,8 @@ class RealBleService implements BleService {
     _ctsSub = null;
     _nusTxSub?.cancel();
     _nusTxSub = null;
-    _connStateSub?.cancel();
-    _connStateSub = null;
+    _connStateEventSub?.cancel();
+    _connStateEventSub = null;
     _nusCompleter?.completeError('disconnected');
     _nusCompleter = null;
     _nusBuffer.clear();
