@@ -12,10 +12,7 @@ import 'cts_parser.dart';
 /// notifications, and bridges NUS command/reply. Bonding is handled by the OS
 /// (system dialog for passkey entry).
 class RealBleService implements BleService {
-  RealBleService({
-    this.dashName = 'ORD Dash',
-    this.scanTimeout = const Duration(seconds: 10),
-  });
+  RealBleService({this.dashName = 'ORD Dash', this.scanTimeout = const Duration(seconds: 10)});
 
   /// The expected hostname of the ORD Dash (default "ORD Dash").
   final String dashName;
@@ -235,10 +232,7 @@ class RealBleService implements BleService {
     });
 
     try {
-      await FlutterBluePlus.startScan(
-        withNames: [dashName],
-        timeout: scanTimeout,
-      );
+      await FlutterBluePlus.startScan(withNames: [dashName], timeout: scanTimeout);
       final device = await completer.future;
       return device;
     } catch (_) {
