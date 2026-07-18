@@ -20,6 +20,7 @@ import 'cts_parser.dart';
 /// Persistent MAC addresses stored in [SharedPreferences].
 class RealBleService implements BleService {
   RealBleService({this.scanTimeout = const Duration(seconds: 10)}) {
+    FlutterBluePlus.setLogLevel(LogLevel.error);
     _seedKnownDevices();
   }
 
@@ -46,13 +47,27 @@ class RealBleService implements BleService {
   StreamSubscription<OnConnectionStateChangedEvent>? _dashConnEventSub;
   StreamSubscription<List<int>>? _ctsSub;
   bool _dashConnected = false;
+  @override
+  bool get dashConnected => _dashConnected;
+  @override
+  set dashConnected(bool value) {
+    debugPrint('[RealBle] dashConnected: $value');
+    _dashConnected = value;
+  }
 
   // -- HRM slot state --
   BluetoothDevice? _hrmDevice;
   BluetoothCharacteristic? _hrmChar;
   StreamSubscription<OnConnectionStateChangedEvent>? _hrmConnEventSub;
   StreamSubscription<List<int>>? _hrmSub;
-  bool _hrmConnected = false;
+  bool _hrmConnected = true;
+  @override
+  bool get hrmConnected => _hrmConnected;
+  @override
+  set hrmConnected(bool value) {
+    debugPrint('[RealBle] hrmConnected: $value');
+    _hrmConnected = value;
+  }
 
   // -- NUS reply reassembly state --
   StreamSubscription<List<int>>? _nusTxSub;
@@ -194,10 +209,12 @@ class RealBleService implements BleService {
       final prefs = await SharedPreferences.getInstance();
       final dashMac = prefs.getString('preferred_dash_mac');
       final hrmMac = prefs.getString('preferred_hrm_mac');
-      for (final mac in [dashMac, hrmMac]) {
-        if (mac != null && !_knownDevices.containsKey(mac)) {
-          _knownDevices[mac] = BleScanResult(deviceId: mac, name: '', inRange: false);
-        }
+
+      if (dashMac != null && !_knownDevices.containsKey(dashMac)) {
+        _knownDevices[dashMac] = BleScanResult(deviceId: dashMac, appearance: 0x0480, name: 'Saved ORD', inRange: false);
+      }
+      if (hrmMac != null && !_knownDevices.containsKey(hrmMac)) {
+        _knownDevices[hrmMac] = BleScanResult(deviceId: hrmMac, appearance: 0x0134, name: 'Saved HRM', inRange: false);
       }
       if (dashMac != null || hrmMac != null) {
         _scanController.add(_knownDevices.values.toList());
@@ -210,9 +227,9 @@ class RealBleService implements BleService {
   // ---------------------------------------------------------------------------
 
   @override
-  Future<void> connectToDash(String deviceId) async {
+  Future<void> connectToDash(String deviceId, {String? name}) async {
     if (_disposed) return;
-    if (_dashConnected) {
+    if (dashConnected) {
       debugPrint('[RealBle] connectToDash: already connected');
       return;
     }
@@ -231,16 +248,17 @@ class RealBleService implements BleService {
     _dashStateController.add(BleConnectionState.connecting);
     debugPrint('[RealBle] connectToDash: found ${device.remoteId}');
 
-    // Persist the MAC.
+    // Persist the MAC and name.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('preferred_dash_mac', deviceId);
+    await prefs.setString('preferred_dash_name', name ?? 'Unnamed ORD');
 
     // Listen for disconnection.
     _dashConnEventSub?.cancel();
     _dashConnEventSub = FlutterBluePlus.events.onConnectionStateChanged.listen((event) {
       if (event.device.remoteId == device.remoteId && event.connectionState == BluetoothConnectionState.disconnected) {
         debugPrint('[RealBle] Dash disconnected');
-        _dashConnected = false;
+        dashConnected = false;
         _dashStateController.add(BleConnectionState.disconnected);
         _onDashDisconnected();
       }
@@ -315,7 +333,7 @@ class RealBleService implements BleService {
       debugPrint('[RealBle] WARNING: NUS TX char not found');
     }
 
-    _dashConnected = true;
+    dashConnected = true;
     _dashStateController.add(BleConnectionState.connected);
     _updateConnectedFlag(deviceId, true);
     _updateKnownDevice(deviceId, name: device.advName.isNotEmpty ? device.advName : device.platformName, appearance: 0x0480);
@@ -327,7 +345,7 @@ class RealBleService implements BleService {
     final device = _dashDevice;
     final deviceId = device?.remoteId.str;
     _dashDevice = null;
-    _dashConnected = false;
+    dashConnected = false;
     _clearDashChars();
 
     // Clear stored MAC.
@@ -344,7 +362,7 @@ class RealBleService implements BleService {
   }
 
   void _onDashDisconnected() {
-    _dashConnected = false;
+    dashConnected = false;
     _clearDashChars();
     _updateConnectedFlag(_dashDevice?.remoteId.str, false);
   }
@@ -373,9 +391,9 @@ class RealBleService implements BleService {
   // ---------------------------------------------------------------------------
 
   @override
-  Future<void> connectToHrm(String deviceId) async {
+  Future<void> connectToHrm(String deviceId, {String? name}) async {
     if (_disposed) return;
-    if (_hrmConnected) {
+    if (hrmConnected) {
       debugPrint('[RealBle] connectToHrm: already connected');
       return;
     }
@@ -393,16 +411,17 @@ class RealBleService implements BleService {
     _hrmStateController.add(BleConnectionState.connecting);
     debugPrint('[RealBle] connectToHrm: found ${device.remoteId}');
 
-    // Persist the MAC.
+    // Persist the MAC and name.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('preferred_hrm_mac', deviceId);
+    await prefs.setString('preferred_hrm_name', name ?? 'Unnamed HRM');
 
     // Listen for disconnection.
     _hrmConnEventSub?.cancel();
     _hrmConnEventSub = FlutterBluePlus.events.onConnectionStateChanged.listen((event) {
       if (event.device.remoteId == device.remoteId && event.connectionState == BluetoothConnectionState.disconnected) {
         debugPrint('[RealBle] HRM disconnected');
-        _hrmConnected = false;
+        hrmConnected = false;
         _hrmStateController.add(BleConnectionState.disconnected);
         _onHrmDisconnected();
       }
@@ -448,7 +467,7 @@ class RealBleService implements BleService {
       debugPrint('[RealBle] WARNING: HRM char not found');
     }
 
-    _hrmConnected = true;
+    hrmConnected = true;
     _hrmStateController.add(BleConnectionState.connected);
     _updateConnectedFlag(deviceId, true);
     _updateKnownDevice(deviceId, name: device.advName.isNotEmpty ? device.advName : device.platformName, appearance: 0x0134);
@@ -461,7 +480,7 @@ class RealBleService implements BleService {
     final device = _hrmDevice;
     final deviceId = device?.remoteId.str;
     _hrmDevice = null;
-    _hrmConnected = false;
+    hrmConnected = false;
     _clearHrmChars();
 
     final prefs = await SharedPreferences.getInstance();
@@ -501,7 +520,7 @@ class RealBleService implements BleService {
   }
 
   void _onHrmDisconnected() {
-    _hrmConnected = false;
+    hrmConnected = false;
     _clearHrmChars();
     _updateConnectedFlag(_hrmDevice?.remoteId.str, false);
   }

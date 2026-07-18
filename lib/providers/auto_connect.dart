@@ -28,7 +28,7 @@ class AutoConnectManager {
 
     // Periodic rescan timer.
     _rescanTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      _maybeRescan();
+      _doAutoConnect();
     });
   }
 
@@ -36,9 +36,16 @@ class AutoConnectManager {
     final prefs = await SharedPreferences.getInstance();
     final dashMac = prefs.getString('preferred_dash_mac');
     final hrmMac = prefs.getString('preferred_hrm_mac');
+    final dashName = prefs.getString('preferred_dash_name');
+    final hrmName = prefs.getString('preferred_hrm_name');
 
     if (dashMac == null && hrmMac == null) {
       debugPrint('[AutoConnect] no stored MACs');
+      return;
+    }
+
+    if (_service.isScanning) {
+      debugPrint('[AutoConnect] already scanning');
       return;
     }
 
@@ -48,25 +55,14 @@ class AutoConnectManager {
     // Give the scan a moment to find devices, then connect.
     await Future.delayed(const Duration(seconds: 3));
 
-    if (dashMac != null) {
-      debugPrint('[AutoConnect] connecting to Dash: $dashMac');
-      await _service.connectToDash(dashMac);
+    if (dashMac != null && !_service.dashConnected) {
+      debugPrint('[AutoConnect] connecting to Dash: $dashName ($dashMac)');
+      await _service.connectToDash(dashMac, name: dashName);
     }
-    if (hrmMac != null) {
+    if (hrmMac != null && !_service.hrmConnected) {
       debugPrint('[AutoConnect] connecting to HRM: $hrmMac');
-      await _service.connectToHrm(hrmMac);
+      await _service.connectToHrm(hrmMac, name: hrmName);
     }
-  }
-
-  void _maybeRescan() {
-    // We can't easily check per-slot disconnection without monitoring the streams,
-    // so we rely on the rescan timer to eventually connect.
-    if (_service.isScanning) {
-      debugPrint('[AutoConnect] rescan skipped — already scanning');
-      return;
-    }
-    debugPrint('[AutoConnect] periodic rescan');
-    _service.startScan();
   }
 
   void dispose() {

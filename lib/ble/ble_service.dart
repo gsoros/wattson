@@ -46,20 +46,26 @@ abstract class BleService {
 
   /// Connect to the ORD Dash at [deviceId] (MAC address).
   /// Discovers CTS + NUS services and subscribes to notifications.
-  Future<void> connectToDash(String deviceId);
+  Future<void> connectToDash(String deviceId, {String? name});
 
   /// Disconnect the Dash slot and clear its MAC from app storage.
   Future<void> disconnectDash();
+
+  /// Whether a device is currently connected to the Dash slot.
+  bool dashConnected = false;
 
   // -- Connection (HRM slot) --
 
   /// Connect to a Heart Rate Monitor at [deviceId] (MAC address).
   /// Discovers HR Service 0x180D and subscribes to HR measurement notify.
   /// Received HR values are forwarded to the Dash's CTS HR char (if connected).
-  Future<void> connectToHrm(String deviceId);
+  Future<void> connectToHrm(String deviceId, {String? name});
 
   /// Disconnect the HRM slot and clear its MAC from app storage.
   Future<void> disconnectHrm();
+
+  /// Whether a device is currently connected to the HRM slot.
+  bool hrmConnected = false;
 
   // -- Device management --
 

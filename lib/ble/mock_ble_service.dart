@@ -23,9 +23,18 @@ class MockBleService implements BleService {
 
   Timer? _tickTimer;
   int _tick = 0;
-  bool _dashConnected = false;
-  bool _hrmConnected = false;
   bool _scanning = false;
+
+  bool _dashConnected = false;
+  @override
+  bool get dashConnected => _dashConnected;
+  @override
+  set dashConnected(bool value) => _dashConnected = value;
+  bool _hrmConnected = false;
+  @override
+  bool get hrmConnected => _hrmConnected;
+  @override
+  set hrmConnected(bool value) => _hrmConnected = value;
 
   @override
   Stream<List<BleScanResult>> get scanResults => _scanController.stream;
@@ -52,13 +61,13 @@ class MockBleService implements BleService {
     _scanning = true;
     final now = DateTime.now();
     _scanController.add([
-      BleScanResult(deviceId: '00:11:22:33:44:55', name: 'ord-dev', rssi: -55, appearance: 0x0480, isConnected: _dashConnected, lastSeen: now),
+      BleScanResult(deviceId: '00:11:22:33:44:55', name: 'ord-dev', rssi: -55, appearance: 0x0480, isConnected: dashConnected, lastSeen: now),
       BleScanResult(
         deviceId: 'AA:BB:CC:DD:EE:FF',
         name: 'Polar H10',
         rssi: -62,
         appearance: 0x0134,
-        isConnected: _hrmConnected,
+        isConnected: hrmConnected,
         lastSeen: now,
         serviceUuids: ['0000180d-0000-1000-8000-00805f9b34fb'],
       ),
@@ -73,17 +82,17 @@ class MockBleService implements BleService {
   // -- Dash --
 
   @override
-  Future<void> connectToDash(String deviceId) async {
+  Future<void> connectToDash(String deviceId, {String? name}) async {
     _dashStateController.add(BleConnectionState.connecting);
     await Future<void>.delayed(const Duration(milliseconds: 400));
-    _dashConnected = true;
+    dashConnected = true;
     _dashStateController.add(BleConnectionState.connected);
     _ensureTickTimer();
   }
 
   @override
   Future<void> disconnectDash() async {
-    _dashConnected = false;
+    dashConnected = false;
     _dashStateController.add(BleConnectionState.disconnected);
     _maybeStopTimer();
   }
@@ -91,17 +100,17 @@ class MockBleService implements BleService {
   // -- HRM --
 
   @override
-  Future<void> connectToHrm(String deviceId) async {
+  Future<void> connectToHrm(String deviceId, {String? name}) async {
     _hrmStateController.add(BleConnectionState.connecting);
     await Future<void>.delayed(const Duration(milliseconds: 300));
-    _hrmConnected = true;
+    hrmConnected = true;
     _hrmStateController.add(BleConnectionState.connected);
     _ensureTickTimer();
   }
 
   @override
   Future<void> disconnectHrm() async {
-    _hrmConnected = false;
+    hrmConnected = false;
     _hrmStateController.add(BleConnectionState.disconnected);
     _maybeStopTimer();
   }
@@ -112,14 +121,14 @@ class MockBleService implements BleService {
   }
 
   void _maybeStopTimer() {
-    if (!_dashConnected && !_hrmConnected) {
+    if (!dashConnected && !hrmConnected) {
       _tickTimer?.cancel();
       _tickTimer = null;
     }
   }
 
   void _onTick(Timer _) {
-    if (!_dashConnected && !_hrmConnected) {
+    if (!dashConnected && !hrmConnected) {
       _maybeStopTimer();
       return;
     }
@@ -127,7 +136,7 @@ class MockBleService implements BleService {
     final t = _tick.toDouble();
 
     // Simulate CTS data if Dash is connected.
-    if (_dashConnected) {
+    if (dashConnected) {
       final speed = 20.0 + 8.0 * sin(t / 20.0);
       final cadence = (60 + 20 * sin(t / 15.0)).round().clamp(0, 120);
       final humanPower = (speed * 3.0 + 20 * sin(t / 10.0)).clamp(0, 400).toDouble();
@@ -137,7 +146,7 @@ class MockBleService implements BleService {
       final current = (motorPower / voltage).clamp(0, 40).toDouble();
       final range = (soc / 100.0 * 720 / (motorPower / speed).clamp(0.5, 50)).clamp(0, 200).toDouble();
       final pas = [0, 1, 2, 3, 4, 5][_tick ~/ 10 % 6];
-      final hr = heartRateEnabled || _hrmConnected ? (120 + 10 * sin(t / 8.0)).round() : 0;
+      final hr = heartRateEnabled || hrmConnected ? (120 + 10 * sin(t / 8.0)).round() : 0;
 
       _telemetryController.add(
         Telemetry(
@@ -154,7 +163,7 @@ class MockBleService implements BleService {
           timestamp: DateTime.now(),
         ),
       );
-    } else if (_hrmConnected) {
+    } else if (hrmConnected) {
       // HRM-only tick: emit HR without full CTS data.
       _telemetryController.add(Telemetry(heartRateBpm: (120 + 10 * sin(t / 8.0)).round(), timestamp: DateTime.now()));
     }
@@ -176,9 +185,9 @@ class MockBleService implements BleService {
 
   @override
   Future<void> forgetDevice(String deviceId) async {
-    if (_dashConnected && deviceId == '00:11:22:33:44:55') {
+    if (dashConnected && deviceId == '00:11:22:33:44:55') {
       await disconnectDash();
-    } else if (_hrmConnected && deviceId == 'AA:BB:CC:DD:EE:FF') {
+    } else if (hrmConnected && deviceId == 'AA:BB:CC:DD:EE:FF') {
       await disconnectHrm();
     }
   }

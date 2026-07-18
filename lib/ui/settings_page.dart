@@ -155,9 +155,9 @@ class _DeviceTile extends ConsumerWidget {
           ? FilledButton(
               onPressed: () {
                 if (isCyclingComputer) {
-                  service.connectToDash(device.deviceId);
+                  service.connectToDash(device.deviceId, name: device.name);
                 } else {
-                  service.connectToHrm(device.deviceId);
+                  service.connectToHrm(device.deviceId, name: device.name);
                 }
               },
               child: const Text('Connect'),
