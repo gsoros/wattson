@@ -13,11 +13,18 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 });
 
 /// Provides the [RecordingService], wired to the live telemetry stream.
+///
+/// On creation, checks for an orphan ride from a previous session and either
+/// resumes or closes it.
 final recordingServiceProvider = Provider<RecordingService>((ref) {
   final db = ref.watch(databaseProvider);
   final bleService = ref.watch(bleServiceProvider);
   final service = RecordingService(database: db, telemetryStream: bleService.telemetry);
   ref.onDispose(service.dispose);
+
+  // Recover any orphan ride left from a previous session.
+  service.recoverOrphanRide();
+
   return service;
 });
 
