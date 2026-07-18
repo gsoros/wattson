@@ -44,7 +44,7 @@ without any hardware.
   `drift` + `drift_dev`, `riverpod`, `permission_handler`, `share_plus`.
 - Folder layout: `lib/{ble,data,providers,ui,export,models}/`.
 
-## Phase 1 — Multi-device BLE connection (Feature 1, revised) IN PROGRESS
+## Phase 1 — Multi-device BLE connection (Feature 1, revised) DONE
 
 `BleService` evolves from a single-device interface to a **multi-device** manager
 with two independent connection slots:
@@ -131,24 +131,30 @@ appearances, but does not filter anything out.
 - Unified `Telemetry` model: `{speed, battV, battI, soc, range, pas,
   humanPower, motorPower, cadence, hr}`.
 
-## Phase 3 — Live display (Feature 3)
+## Phase 3 — Live display (Feature 3) DONE
 
-- Ride screen: human power, motor power, cadence, speed, HR, PAS, battery SoC + V, range
-- Additional fields while recording: elapsed, time-in-motion, distance, elevation gain.
-- `Telemetry` stream → Riverpod → widgets.
+- Ride screen: human power, motor power, cadence, speed, HR, PAS, battery SoC + V, range.
+  Layout: speed hero card (full-width, large displayMedium), secondary metrics in a 2-column
+  Wrap grid (MetricTile: label/value/unit stacked), battery tile with SoC progress bar + voltage.
+- Additional fields while recording: elapsed, distance, elevation gain shown in a TripStatsTile.
+- Recording controls pinned to bottom: Record FAB (disabled/greyed when no device connected),
+  Pause/Stop during recording, Resume/Stop when paused. Stop/pause always enabled during
+  active session regardless of connection state.
+- `Telemetry` stream → `telemetryProvider` → `_RideContent` widget.
 
-## Phase 4 — Recording (Feature 4)
+## Phase 4 — Recording (Feature 4) DONE
 
-- Start/stop/pause session. `flutter_foreground_task` holds wake-lock +
-  persistent notification (Android 14 `location` type) while the **main isolate**
-  keeps the `flutter_blue_plus` connection (per decision).
-- `geolocator` GPS stream + permission handling; `elevation gain` = GPS altitude 
-  gain (climbing a 100m tall hill 3 times = 300m gain, only positive vertical delta is recorded).
-- Drift append-only `samples` (1 row / CTS tick). GPS joined by nearest-timestamp
-  interpolation into the same row.
-- `rides` summary computed at stop.
+- `RecordingService` (`lib/data/recording_service.dart`): manages start/pause/resume/stop.
+  Listens to telemetry stream + GPS (Geolocator.getPositionStream, high accuracy). On every
+  CTS tick while recording, writes a `Sample` row to Drift and accumulates elapsed time,
+  distance (odometry from speed × tick), and elevation gain (positive-only GPS altitude delta).
+- `RecordingState` / `RecordingStatus`: immutable snapshot for UI (elapsed, distance, climb, rideId).
+- `RecordingService.stateStream` yields current state via `_withInitialState` helper in the
+  provider so Riverpod's StreamProvider never starts in `loading`.
+- GPS started on construction so first fix is ready when user hits Record.
+- Elevation: only positive deltas accumulated (climbing 100m hill 3 times = 300m gain).
 
-## Phase 5 — Data layer (Drift schema, refined)
+## Phase 5 — Data layer (Drift schema, refined) DONE
 
 ```sql
 rides(id PK, start_time, end_time, time_in_motion, distance,
@@ -158,9 +164,11 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
         cadence, pas_level, hr, battery_v, battery_a, soc, range)
 ```
 
-- `assist_ratio` = motor / (human + motor). `time_in_motion` = Σ ticks where
-  speed > threshold.
-- WAL mode (survives hard kill mid-write).
+- `AppDatabase` in `lib/data/database.dart`: Drift with WAL mode (NativeDatabase).
+- `drift_dev` + `build_runner` in dev_dependencies for codegen.
+- `databaseProvider` singleton in `recording_provider.dart`.
+- `recordingServiceProvider` wires `RecordingService(database, bleService.telemetry)`.
+- `recordingStateProvider` = `StreamProvider<RecordingState>` with initial-state yield.
 
 ## Phase 6 — Export (Feature 5, GPX + CSV)
 
@@ -198,12 +206,13 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 |---|---|
 | M0 | Scaffold + `BleService` interface + `MockBleService` | **DONE** |
 | M1 | Single Dash connection + CTS parser (live values) | **DONE** |
-| M2 | Multi-device BLE (Dash + HRM) + settings page + auto-connect | **IN PROGRESS** |
-| M3 | Live ride screen |
-| M4 | Recording + Drift + foreground service |
-| M5 | GPX/CSV export |
-| M6 | NUS + device config UI |
-| M7 | Permissions, iOS pass, tests, polish |
+| M2 | Multi-device BLE (Dash + HRM) + settings page + auto-connect | **DONE** |
+| M3 | Live display (ride screen, 2-column layout, battery bar) | **DONE** |
+| M4 | Recording (Drift DB, RecordingService, start/pause/stop, GPS) | **DONE** |
+| M5 | Foreground service + background recording | **DONE** |
+| M6 | Export (GPX + CSV, share_plus) | |
+| M7 | Device config (Wi-Fi, hostname, etc. via NUS) | |
+| M8 | Permissions, iOS pass, tests, polish |
 
 **Firmware dependencies:** M1 needs NUS only for config (M6); M2's push-to-Dash
 needs the HR write char. Both firmware tasks are DONE.

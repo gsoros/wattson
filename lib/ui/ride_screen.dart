@@ -13,7 +13,10 @@ import 'settings_page.dart';
 /// Shows ORD Dash telemetry and HRM heart rate in a clean card layout, with
 /// recording controls at the bottom.
 class RideScreen extends ConsumerWidget {
-  const RideScreen({super.key});
+  const RideScreen({super.key, this.onShowHistory});
+
+  /// Called when the user wants to navigate to the ride history page.
+  final VoidCallback? onShowHistory;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,6 +43,7 @@ class RideScreen extends ConsumerWidget {
               }),
             ),
           ),
+          IconButton(icon: const Icon(Icons.history), tooltip: 'Ride History', onPressed: onShowHistory),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: 'Settings',

@@ -1,11 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../data/database.dart';
 import '../models/recording_state.dart';
 import '../models/telemetry.dart';
+import '../service/recording_task_handler.dart';
 
 /// Threshold below which the bike is considered stopped (km/h).
 const double _motionThreshold = 2.0;
@@ -19,11 +23,7 @@ const double _motionThreshold = 2.0;
 /// GPS positions are taken from the most recent fix at the time the sample is
 /// written — no interpolation; the nearest fix is good enough for ~1 Hz CTS.
 class RecordingService {
-  RecordingService({required AppDatabase database, required this._telemetryStream}) : _db = database {
-    _gpsSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 0, timeLimit: null),
-    ).listen(_onGpsPosition);
-  }
+  RecordingService({required AppDatabase database, required this._telemetryStream}) : _db = database;
 
   final AppDatabase _db;
   final Stream<Telemetry> _telemetryStream;
@@ -58,16 +58,36 @@ class RecordingService {
   Future<void> start() async {
     if (_state.isActive) return;
 
-    // Insert a new ride row.
-    final rideId = await _db.into(_db.rides).insert(RidesCompanion.insert(startTime: DateTime.now()));
-
+    // Emit recording state immediately so the UI swaps to pause/stop buttons
+    // without waiting for the async setup below.
     _tickStart = DateTime.now();
-    _state = _state.copyWith(status: RecordingStatus.recording, rideId: rideId);
+    _state = _state.copyWith(status: RecordingStatus.recording);
+    _stateController.add(_state);
 
     _telemetrySub?.cancel();
     _telemetrySub = _telemetryStream.listen(_onTelemetry);
 
+    // Start foreground service (wake-lock + notification).
+    await FlutterForegroundTask.startService(
+      serviceId: 501,
+      serviceTypes: const [ForegroundServiceTypes.location],
+      notificationTitle: 'Wattson',
+      notificationText: 'Recording ride…',
+      callback: startForegroundCallback,
+    );
+
+    // Insert a new ride row and update state with the real rideId.
+    final rideId = await _db.into(_db.rides).insert(RidesCompanion.insert(startTime: DateTime.now()));
+    _state = _state.copyWith(rideId: rideId);
     _stateController.add(_state);
+
+    // Defer GPS to the next microtask so the UI can render the recording state
+    // before the potentially-blocking platform channel call.
+    Future.microtask(() {
+      _gpsSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 0, timeLimit: null),
+      ).listen(_onGpsPosition);
+    });
   }
 
   /// Pause the current session.
@@ -104,6 +124,13 @@ class RecordingService {
 
     _state = _state.copyWith(status: RecordingStatus.idle, rideId: null);
     _stateController.add(_state);
+
+    // Stop foreground service.
+    await FlutterForegroundTask.stopService();
+
+    // Stop GPS.
+    _gpsSub?.cancel();
+    _gpsSub = null;
   }
 
   /// Dispose resources.
@@ -162,28 +189,32 @@ class RecordingService {
     );
     _stateController.add(_state);
 
-    // Write a sample row.
-    _db
-        .into(_db.samples)
-        .insert(
-          SamplesCompanion.insert(
-            rideId: _state.rideId!,
-            ts: now,
-            lat: Value(_hasGps ? _lastLat : null),
-            lon: Value(_hasGps ? _lastLon : null),
-            elevation: Value(_hasGps ? _lastElevation : null),
-            speedKmh: t.speedKmh,
-            humanPowerW: t.humanPowerW,
-            motorPowerW: t.motorPowerW,
-            cadenceRpm: t.cadenceRpm,
-            pasLevel: t.pasLevel,
-            hrBpm: t.heartRateBpm,
-            batteryV: t.batteryVoltage,
-            batteryA: t.batteryCurrent,
-            soc: t.soc,
-            rangeKm: t.rangeKm,
-          ),
-        );
+    if (_state.rideId == null) {
+      debugPrint('[RecordingService] ERROR: rideId is null');
+    } else {
+      // Write a sample row.
+      _db
+          .into(_db.samples)
+          .insert(
+            SamplesCompanion.insert(
+              rideId: _state.rideId!, // Throws: Null check used on a null value
+              ts: now,
+              lat: Value(_hasGps ? _lastLat : null),
+              lon: Value(_hasGps ? _lastLon : null),
+              elevation: Value(_hasGps ? _lastElevation : null),
+              speedKmh: t.speedKmh,
+              humanPowerW: t.humanPowerW,
+              motorPowerW: t.motorPowerW,
+              cadenceRpm: t.cadenceRpm,
+              pasLevel: t.pasLevel,
+              hrBpm: t.heartRateBpm,
+              batteryV: t.batteryVoltage,
+              batteryA: t.batteryCurrent,
+              soc: t.soc,
+              rangeKm: t.rangeKm,
+            ),
+          );
+    }
 
     _tickStart = now;
   }
