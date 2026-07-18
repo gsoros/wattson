@@ -60,7 +60,7 @@ class RealBleService implements BleService {
   BluetoothCharacteristic? _hrmChar;
   StreamSubscription<OnConnectionStateChangedEvent>? _hrmConnEventSub;
   StreamSubscription<List<int>>? _hrmSub;
-  bool _hrmConnected = true;
+  bool _hrmConnected = false;
   @override
   bool get hrmConnected => _hrmConnected;
   @override
