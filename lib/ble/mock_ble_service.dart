@@ -150,6 +150,8 @@ class MockBleService implements BleService {
 
       _telemetryController.add(
         Telemetry(
+          ordValid: true,
+          hrmValid: hr != 0,
           speedKmh: speed,
           batteryVoltage: voltage,
           batteryCurrent: current,
@@ -165,17 +167,18 @@ class MockBleService implements BleService {
       );
     } else if (hrmConnected) {
       // HRM-only tick: emit HR without full CTS data.
-      _telemetryController.add(Telemetry(heartRateBpm: (120 + 10 * sin(t / 8.0)).round(), timestamp: DateTime.now()));
+      _telemetryController.add(Telemetry(hrmValid: true, heartRateBpm: (120 + 10 * sin(t / 8.0)).round(), timestamp: DateTime.now()));
     }
   }
 
   @override
   Future<String?> sendCommand(String line) async {
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    if (line.startsWith('hostname')) return 'ord';
-    if (line.startsWith('ble')) return 'enabled: true, connected: true';
-    if (line.startsWith('battery')) return '720';
-    return 'API [$line] (Success) ok';
+    String replyPrefix = 'API [$line] (Success)';
+    if (line.startsWith('hostname')) return '$replyPrefix ord-dev';
+    if (line.startsWith('ble')) return '$replyPrefix enabled: true, connected: true';
+    if (line.startsWith('battery')) return '$replyPrefix 720';
+    return '$replyPrefix ok';
   }
 
   @override

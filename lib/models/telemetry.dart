@@ -6,6 +6,8 @@
 ///  - HRM: heart rate
 class Telemetry {
   const Telemetry({
+    this.ordValid = false,
+    this.hrmValid = false,
     this.speedKmh = 0,
     this.batteryVoltage = 0,
     this.batteryCurrent = 0,
@@ -16,8 +18,14 @@ class Telemetry {
     this.motorPowerW = 0,
     this.cadenceRpm = 0,
     this.heartRateBpm = 0,
-    required this.timestamp,
+    this.timestamp,
   });
+
+  /// Whether ORD values are valid.
+  final bool ordValid;
+
+  /// Whether HRM value is valid.
+  final bool hrmValid;
 
   /// Speed in km/h.
   final double speedKmh;
@@ -53,6 +61,8 @@ class Telemetry {
   final DateTime timestamp;
 
   Telemetry copyWith({
+    bool? ordValid,
+    bool? hrmValid,
     double? speedKmh,
     double? batteryVoltage,
     double? batteryCurrent,
@@ -66,6 +76,8 @@ class Telemetry {
     DateTime? timestamp,
   }) {
     return Telemetry(
+      ordValid: ordValid ?? this.ordValid,
+      hrmValid: hrmValid ?? this.hrmValid,
       speedKmh: speedKmh ?? this.speedKmh,
       batteryVoltage: batteryVoltage ?? this.batteryVoltage,
       batteryCurrent: batteryCurrent ?? this.batteryCurrent,

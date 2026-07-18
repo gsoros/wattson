@@ -664,12 +664,58 @@ class RealBleService implements BleService {
     }
   }
 
+  /// Update the [ordValid] flag in the last known telemetry sample and re-emit.
+  void _updateOrdValid(bool valid) {
+    // TODO: STOP. Revise telemetry state storage.
+    // This is getting messy. A cleaner approach would be:
+    // Single telemetry storage instead of passing around copies.
+    // Single interface for changing telemetry values.
+    // Telemetry is responsible for notifying listeners on change.
+    // e.g.
+    // class Telemetry {
+    //   bool ordValid = false;
+    //   bool hrmValid = false;
+    //   DateTime lastOrdUpdate;
+    //   DateTime lastHrmUpdate;
+    //   double _speed;
+    //   int hearRate;
+    //   double get speed => _speed;
+    //   set speed(double value) {
+    //     _speed = value;
+    //     lastOrdUpdate = DateTime.now();
+    //     ordValid = true;
+    //     _notifyListeners();
+    //   }
+    //   void setMultiple({double speed, double batteryVoltage}) {...}
+    // }
+    //
+    // class BleService {
+    //   Stream<Telemetry> get telemetry => _telemetryController.stream;
+    //
+    //   void _onCtsValue(List<int> value) {
+    //     try {
+    //       final telemetry = CtsParser.parse(value, timestamp: DateTime.now());
+    //       _telemetryController.add(telemetry);
+    //     } on CtsParseException {
+    //       // Ignore malformed payloads.
+    //     } on CtsVersionException {
+    //       // Ignore unknown versions; forward-compat.
+    //     }
+
+    // }
+  }
+
+  /// Update the [hrmValid] flag in the last known telemetry sample and re-emit.
+  void _updateHrmValid(bool valid) {
+    // TODO
+  }
+
   void _onCtsValue(List<int> value) {
     try {
       final telemetry = CtsParser.parse(value, timestamp: DateTime.now());
       final motorPower = telemetry.batteryVoltage * telemetry.batteryCurrent;
       // Preserve the last known HR so CTS updates don't clobber it.
-      final result = telemetry.copyWith(motorPowerW: motorPower, heartRateBpm: _lastHeartRateBpm);
+      final result = telemetry.copyWith(ordValid: true, motorPowerW: motorPower, heartRateBpm: _lastHeartRateBpm);
       _lastTelemetry = result;
       _telemetryController.add(result);
     } on CtsParseException {
@@ -718,9 +764,9 @@ class RealBleService implements BleService {
     _lastHeartRateBpm = bpm;
     final last = _lastTelemetry;
     if (last != null) {
-      _telemetryController.add(last.copyWith(heartRateBpm: bpm, timestamp: DateTime.now()));
+      _telemetryController.add(last.copyWith(hrmValid: true, heartRateBpm: bpm, timestamp: DateTime.now()));
     } else {
-      _telemetryController.add(Telemetry(heartRateBpm: bpm, timestamp: DateTime.now()));
+      _telemetryController.add(Telemetry(hrmValid: true, heartRateBpm: bpm, timestamp: DateTime.now()));
     }
 
     // Forward to Dash's CTS HR char if connected.

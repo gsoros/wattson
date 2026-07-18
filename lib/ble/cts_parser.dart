@@ -44,6 +44,8 @@ class CtsParser {
     final cadence = payload[13];
 
     return Telemetry(
+      ordValid: true,
+      hrmValid: false,
       speedKmh: speed,
       batteryVoltage: voltage,
       batteryCurrent: current,
