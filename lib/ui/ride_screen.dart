@@ -2,17 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ble/ble_service.dart';
+import '../models/recording_state.dart';
 import '../models/telemetry.dart';
 import '../providers/ble_provider.dart';
+import '../providers/recording_provider.dart';
 import 'settings_page.dart';
 
-/// Live ride screen (Phase 3).
+/// Live ride screen (Phase 4).
 ///
-/// Shows ORD Dash telemetry and HRM heart rate in a clean card layout:
-///   - Speed as a hero metric (full-width).
-///   - Secondary metrics in a 2-column grid (human power, motor power, cadence,
-///     heart rate, PAS level, range).
-///   - Battery summary row (SoC bar + voltage).
+/// Shows ORD Dash telemetry and HRM heart rate in a clean card layout, with
+/// recording controls at the bottom.
 class RideScreen extends ConsumerWidget {
   const RideScreen({super.key});
 
@@ -21,6 +20,7 @@ class RideScreen extends ConsumerWidget {
     final dashState = ref.watch(dashConnectionStateProvider);
     final hrmState = ref.watch(hrmConnectionStateProvider);
     final telemetry = ref.watch(telemetryProvider);
+    final recordingAsync = ref.watch(recordingStateProvider);
     final connected = dashState.value == BleConnectionState.connected || hrmState.value == BleConnectionState.connected;
 
     return Scaffold(
@@ -49,29 +49,147 @@ class RideScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: !connected
-          ? const Center(child: Text('No data — connect a device'))
-          : telemetry.when(
-              data: (t) => _RideContent(t: t),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Telemetry error: $e')),
+      body: Stack(
+        children: [
+          // Main content
+          !connected
+              ? const Center(child: Text('No data — connect a device'))
+              : telemetry.when(
+                  data: (t) => _RideContent(t: t),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Telemetry error: $e')),
+                ),
+          // Recording controls always visible at the bottom.
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: recordingAsync.when(
+              data: (rs) => _RecordingControlBar(rs: rs, canRecord: connected),
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
             ),
+          ),
+        ],
+      ),
     );
   }
 }
 
+// ---------------------------------------------------------------------------
+// Recording control bar
+// ---------------------------------------------------------------------------
+
+class _RecordingControlBar extends ConsumerWidget {
+  const _RecordingControlBar({required this.rs, required this.canRecord});
+  final RecordingState rs;
+  final bool canRecord;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final service = ref.read(recordingServiceProvider);
+    final theme = Theme.of(context);
+
+    Widget button;
+    String? label;
+
+    switch (rs.status) {
+      case RecordingStatus.idle:
+        button = FloatingActionButton.large(
+          heroTag: 'record',
+          onPressed: canRecord ? () => service.start() : null,
+          backgroundColor: canRecord ? Colors.red : theme.colorScheme.surfaceContainerHighest,
+          child: Icon(Icons.fiber_manual_record, color: canRecord ? Colors.white : theme.colorScheme.onSurfaceVariant),
+        );
+        label = canRecord ? 'Record' : 'Connect a device to record';
+      case RecordingStatus.recording:
+        button = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton.small(
+              heroTag: 'pause',
+              onPressed: () => service.pause(),
+              backgroundColor: Colors.orange,
+              child: const Icon(Icons.pause, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            FloatingActionButton.small(
+              heroTag: 'stop',
+              onPressed: () => service.stop(),
+              backgroundColor: Colors.red,
+              child: const Icon(Icons.stop, color: Colors.white),
+            ),
+          ],
+        );
+        label = '${_formatDuration(rs.elapsed)}  ·  ${rs.distanceKm.toStringAsFixed(1)} km';
+      case RecordingStatus.paused:
+        button = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton.small(
+              heroTag: 'resume',
+              onPressed: () => service.resume(),
+              backgroundColor: Colors.red,
+              child: const Icon(Icons.fiber_manual_record, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            FloatingActionButton.small(
+              heroTag: 'stop2',
+              onPressed: () => service.stop(),
+              backgroundColor: Colors.grey,
+              child: const Icon(Icons.stop, color: Colors.white),
+            ),
+          ],
+        );
+        label = 'Paused  ·  ${_formatDuration(rs.elapsed)}';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: theme.textTheme.labelMedium),
+            const SizedBox(height: 8),
+            button,
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    if (h > 0) return '${h}h ${m}m ${s}s';
+    if (m > 0) return '${m}m ${s}s';
+    return '${s}s';
+  }
+}
+
 /// The inner content so we can use non-const keys on the cards.
-class _RideContent extends StatelessWidget {
+class _RideContent extends ConsumerWidget {
   const _RideContent({required this.t});
   final Telemetry t;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final metrics = <Widget>[];
+    final rs = ref.watch(recordingStateProvider).asData?.value;
 
     // -- Hero speed --
     if (t.ordValid) {
       metrics.add(_SpeedTile(speedKmh: t.speedKmh));
+    }
+
+    // -- Trip stats (shown while recording) --
+    if (rs != null && rs.isActive) {
+      metrics.add(_TripStatsTile(elapsed: rs.elapsed, distanceKm: rs.distanceKm, elevationGainM: rs.elevationGainM));
     }
 
     // -- Secondary grid --
@@ -107,13 +225,71 @@ class _RideContent extends StatelessWidget {
       metrics.add(_BatteryTile(soc: t.soc, voltage: t.batteryVoltage));
     }
 
-    return ListView(padding: const EdgeInsets.fromLTRB(0, 8, 0, 24), children: metrics);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 120), // bottom padding for control bar
+      children: metrics,
+    );
   }
 
   double _gridChildWidth(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     // 2 columns with 8px gaps and 12px side padding
     return (width - 12 * 2 - 8) / 2;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Trip stats tile (shown while recording)
+// ---------------------------------------------------------------------------
+
+class _TripStatsTile extends StatelessWidget {
+  const _TripStatsTile({required this.elapsed, required this.distanceKm, required this.elevationGainM});
+  final Duration elapsed;
+  final double distanceKm;
+  final double elevationGainM;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _Stat(theme: theme, label: 'Time', value: _fmt(elapsed)),
+            _Stat(theme: theme, label: 'Distance', value: '${distanceKm.toStringAsFixed(1)} km'),
+            _Stat(theme: theme, label: 'Climb', value: '${elevationGainM.toStringAsFixed(0)} m'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _fmt(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
+    return '${m}m ${s.toString().padLeft(2, '0')}s';
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.theme, required this.label, required this.value});
+  final ThemeData theme;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(value, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+      ],
+    );
   }
 }
 
