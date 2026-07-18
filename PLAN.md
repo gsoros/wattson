@@ -133,8 +133,8 @@ appearances, but does not filter anything out.
 
 ## Phase 3 — Live display (Feature 3)
 
-- Ride screen: human power, motor power, cadence, speed, HR, elapsed,
-  time-in-motion, distance.
+- Ride screen: human power, motor power, cadence, speed, HR, PAS, battery SoC + V, range
+- Additional fields while recording: elapsed, time-in-motion, distance, elevation gain.
 - `Telemetry` stream → Riverpod → widgets.
 
 ## Phase 4 — Recording (Feature 4)
@@ -143,7 +143,7 @@ appearances, but does not filter anything out.
   persistent notification (Android 14 `location` type) while the **main isolate**
   keeps the `flutter_blue_plus` connection (per decision).
 - `geolocator` GPS stream + permission handling; `elevation gain` = GPS altitude 
-  gain (climbing a 100m tall hill 3 times = 300m gain).
+  gain (climbing a 100m tall hill 3 times = 300m gain, only positive vertical delta is recorded).
 - Drift append-only `samples` (1 row / CTS tick). GPS joined by nearest-timestamp
   interpolation into the same row.
 - `rides` summary computed at stop.
