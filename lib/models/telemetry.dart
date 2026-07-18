@@ -58,7 +58,7 @@ class Telemetry {
   final int heartRateBpm;
 
   /// Time the sample was produced/received.
-  final DateTime timestamp;
+  final DateTime? timestamp;
 
   Telemetry copyWith({
     bool? ordValid,

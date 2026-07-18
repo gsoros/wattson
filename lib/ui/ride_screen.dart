@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../ble/ble_service.dart';
 import '../providers/ble_provider.dart';
 import 'settings_page.dart';
-import '../models/telemetry.dart';
 
 /// Basic live ride screen (M0/M3 placeholder).
 class RideScreen extends ConsumerWidget {
