@@ -5,14 +5,21 @@
     <!-- Location (required for BLE scan on older Android; some 12+ devices also need it) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Foreground service (future recording) -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Foreground service (recording) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:label="wattson"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <service 
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="location"
+            android:exported="false" 
+            />
         <activity
             android:name=".MainActivity"
             android:exported="true"

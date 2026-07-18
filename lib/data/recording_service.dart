@@ -61,6 +61,8 @@ class RecordingService {
   Future<void> start({int? rideId}) async {
     if (_state.isActive) return;
 
+    debugPrint('[RecordingService] starting ride #${rideId ?? 'new'}');
+
     // Emit recording state immediately so the UI swaps to pause/stop buttons
     // without waiting for the async setup below.
     _tickStart = DateTime.now();
@@ -84,6 +86,7 @@ class RecordingService {
       final newId = await _db.into(_db.rides).insert(RidesCompanion.insert(startTime: DateTime.now()));
       _state = _state.copyWith(rideId: newId);
       _stateController.add(_state);
+      debugPrint('[RecordingService] inserted new ride #$newId');
     }
 
     // Defer GPS to the next microtask so the UI can render the recording state
@@ -114,6 +117,8 @@ class RecordingService {
   Future<void> stop() async {
     if (!_state.isActive) return;
 
+    debugPrint('[RecordingService] stopping');
+
     _telemetrySub?.cancel();
     _telemetrySub = null;
 
@@ -136,6 +141,8 @@ class RecordingService {
     // Stop GPS.
     _gpsSub?.cancel();
     _gpsSub = null;
+
+    debugPrint('[RecordingService] stopped');
   }
 
   /// Check for an orphan ride (endTime == null) left from a previous session.
@@ -286,7 +293,7 @@ class RecordingService {
     _stateController.add(_state);
 
     if (_state.rideId == null) {
-      debugPrint('[RecordingService] ERROR: rideId is null');
+      //debugPrint('[RecordingService] rideId is null, dropping sample');
     } else {
       // Write a sample row.
       _db

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'providers/ble_provider.dart';
 import 'ui/ride_history_page.dart';
-import 'ui/ride_screen.dart';
+import 'ui/ride_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,7 +83,7 @@ class _MainShellState extends State<_MainShell> {
     return PageView(
       controller: _pageController,
       children: [
-        RideScreen(onShowHistory: _showHistory),
+        RidePage(onShowHistory: _showHistory),
         RideHistoryPage(onNavigateBack: _showRideScreen),
       ],
     );

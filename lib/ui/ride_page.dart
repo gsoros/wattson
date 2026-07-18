@@ -12,8 +12,8 @@ import 'settings_page.dart';
 ///
 /// Shows ORD Dash telemetry and HRM heart rate in a clean card layout, with
 /// recording controls at the bottom.
-class RideScreen extends ConsumerWidget {
-  const RideScreen({super.key, this.onShowHistory});
+class RidePage extends ConsumerWidget {
+  const RidePage({super.key, this.onShowHistory});
 
   /// Called when the user wants to navigate to the ride history page.
   final VoidCallback? onShowHistory;
@@ -204,7 +204,7 @@ class _RideContent extends ConsumerWidget {
         _MetricTile(label: 'Motor Power', value: t.motorPowerW.toStringAsFixed(0), unit: 'W'),
         _MetricTile(label: 'Cadence', value: t.cadenceRpm.toString(), unit: 'RPM'),
         _MetricTile(label: 'PAS Level', value: t.pasLevel.toString(), unit: ''),
-        _MetricTile(label: 'Range', value: t.rangeKm.toStringAsFixed(1), unit: 'km'),
+        _MetricTile(label: 'Range', value: t.rangeKm.toStringAsFixed(0), unit: 'km'),
       ]);
     }
     if (t.hrmValid) {
@@ -311,10 +311,10 @@ class _SpeedTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Column(
           children: [
-            Text(speedKmh.toStringAsFixed(1), style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Text(speedKmh.toStringAsFixed(1), style: theme.textTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 64.0)),
             const SizedBox(height: 4),
             Text('km/h', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ],
@@ -337,17 +337,41 @@ class _MetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 8),
-            Text(value, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w600)),
-            if (unit.isNotEmpty) Text(unit, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ],
+    return AspectRatio(
+      aspectRatio: 5.0 / 3.0,
+      child: Card(
+        margin: const EdgeInsets.all(0.0),
+        child: Padding(
+          padding: const EdgeInsets.all(6.0),
+          child: Stack(
+            children: [
+              Align(
+                alignment: Alignment.topCenter, // const FractionalOffset(0.5, -1.0),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.topCenter,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 64,
+                      height: 1.1, // Collapses the bounding box height to the text size
+                      leadingDistribution: TextLeadingDistribution.even,
+                    ),
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10)),
+              ),
+              if (unit.isNotEmpty)
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Text(unit, style: TextStyle(fontSize: 10)),
+                ),
+            ],
+          ),
         ),
       ),
     );
