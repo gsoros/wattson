@@ -214,7 +214,7 @@ class _RideContent extends ConsumerWidget {
     if (gridChildren.isNotEmpty) {
       metrics.add(
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.fromLTRB(12.0, 4.0, 12.0, 0.0),
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -226,7 +226,12 @@ class _RideContent extends ConsumerWidget {
 
     // -- Battery summary --
     if (t.ordValid) {
-      metrics.add(_BatteryTile(soc: t.soc, voltage: t.batteryVoltage));
+      metrics.add(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(0.0, 4.0, 0.0, 0.0),
+          child: _BatteryTile(soc: t.soc, voltage: t.batteryVoltage),
+        ),
+      );
     }
 
     return ListView(
@@ -314,7 +319,7 @@ class _SpeedTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Column(
           children: [
-            Text(speedKmh.toStringAsFixed(1), style: theme.textTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: 64.0)),
+            Text(speedKmh.toStringAsFixed(1), style: theme.textTheme.displayLarge?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text('km/h', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ],
@@ -337,13 +342,14 @@ class _MetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AspectRatio(
-      aspectRatio: 5.0 / 3.0,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 80, maxHeight: 80),
       child: Card(
         margin: const EdgeInsets.all(0.0),
         child: Padding(
           padding: const EdgeInsets.all(6.0),
           child: Stack(
+            fit: StackFit.expand,
             children: [
               Align(
                 alignment: Alignment.topCenter, // const FractionalOffset(0.5, -1.0),
@@ -352,23 +358,21 @@ class _MetricTile extends StatelessWidget {
                   alignment: Alignment.topCenter,
                   child: Text(
                     value,
-                    style: TextStyle(
+                    style: theme.textTheme.displayLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 64,
-                      height: 1.1, // Collapses the bounding box height to the text size
-                      leadingDistribution: TextLeadingDistribution.even,
+                      height: 0.85, // Collapses the bounding box height to the text size
                     ),
                   ),
                 ),
               ),
               Align(
                 alignment: Alignment.bottomLeft,
-                child: Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10)),
+                child: Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ),
               if (unit.isNotEmpty)
                 Align(
                   alignment: Alignment.bottomRight,
-                  child: Text(unit, style: TextStyle(fontSize: 10)),
+                  child: Text(unit, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 ),
             ],
           ),
