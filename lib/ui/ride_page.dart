@@ -108,38 +108,42 @@ class _RecordingControlBar extends ConsumerWidget {
         button = Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            FloatingActionButton.small(
-              heroTag: 'pause',
-              onPressed: () => service.pause(),
+            _HoldToConfirmButton(
+              icon: Icons.pause,
               backgroundColor: Colors.orange,
-              child: const Icon(Icons.pause, color: Colors.white),
+              iconColor: Colors.white,
+              tooltip: 'Hold to pause',
+              onConfirmed: () => service.pause(),
             ),
-            const SizedBox(width: 12),
-            FloatingActionButton.small(
-              heroTag: 'stop',
-              onPressed: () => service.stop(),
+            const SizedBox(width: 48),
+            _HoldToConfirmButton(
+              icon: Icons.stop,
               backgroundColor: Colors.red,
-              child: const Icon(Icons.stop, color: Colors.white),
+              iconColor: Colors.white,
+              tooltip: 'Hold to stop',
+              onConfirmed: () => service.stop(),
             ),
           ],
         );
-        label = '${_formatDuration(rs.elapsed)}  ·  ${rs.distanceKm.toStringAsFixed(1)} km';
+      //label = '${_formatDuration(rs.elapsed)}  ·  ${rs.distanceKm.toStringAsFixed(1)} km';
       case RecordingStatus.paused:
         button = Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            FloatingActionButton.small(
-              heroTag: 'resume',
-              onPressed: () => service.resume(),
+            _HoldToConfirmButton(
+              icon: Icons.fiber_manual_record,
               backgroundColor: Colors.red,
-              child: const Icon(Icons.fiber_manual_record, color: Colors.white),
+              iconColor: Colors.white,
+              tooltip: 'Hold to resume',
+              onConfirmed: () => service.resume(),
             ),
-            const SizedBox(width: 12),
-            FloatingActionButton.small(
-              heroTag: 'stop2',
-              onPressed: () => service.stop(),
+            const SizedBox(width: 48),
+            _HoldToConfirmButton(
+              icon: Icons.stop,
               backgroundColor: Colors.grey,
-              child: const Icon(Icons.stop, color: Colors.white),
+              iconColor: Colors.white,
+              tooltip: 'Hold to stop',
+              onConfirmed: () => service.stop(),
             ),
           ],
         );
@@ -157,7 +161,7 @@ class _RecordingControlBar extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: theme.textTheme.labelMedium),
+            Text(label ?? '', style: theme.textTheme.labelMedium),
             const SizedBox(height: 8),
             button,
           ],
@@ -173,6 +177,131 @@ class _RecordingControlBar extends ConsumerWidget {
     if (h > 0) return '${h}h ${m}m ${s}s';
     if (m > 0) return '${m}m ${s}s';
     return '${s}s';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hold-to-confirm button (progress ring)
+// ---------------------------------------------------------------------------
+//
+// Used for destructive / easy-to-miss actions (pause, stop, resume) so they
+// can't be triggered by an accidental tap. The user must press and hold; a
+// circular indicator fills over ~600 ms and the action only fires once the
+// ring completes. Releasing early cancels.
+
+class _HoldToConfirmButton extends StatefulWidget {
+  const _HoldToConfirmButton({required this.icon, required this.backgroundColor, required this.onConfirmed, this.iconColor = Colors.white, this.tooltip});
+
+  final IconData icon;
+  final Color backgroundColor;
+  final Color iconColor;
+  final VoidCallback onConfirmed;
+  final String? tooltip;
+
+  @override
+  State<_HoldToConfirmButton> createState() => _HoldToConfirmButtonState();
+}
+
+class _HoldToConfirmButtonState extends State<_HoldToConfirmButton> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  /// True once a full hold completes, so the trailing tap (which fires after
+  /// the finger lifts) doesn't also pop the "press and hold" hint.
+  bool _confirmed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2500))..addStatusListener(_onStatus);
+  }
+
+  void _onStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      _confirmed = true;
+      widget.onConfirmed();
+    }
+  }
+
+  void _start() {
+    _confirmed = false;
+    _controller.forward();
+  }
+
+  void _cancel() {
+    switch (_controller.status) {
+      case AnimationStatus.forward:
+        _controller.reverse();
+      case AnimationStatus.completed:
+        _controller.value = 0; // reset after the user releases
+      case AnimationStatus.reverse:
+      case AnimationStatus.dismissed:
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: true,
+      label: widget.tooltip,
+      child: GestureDetector(
+        onTapDown: (_) => _start(),
+        onTapUp: (_) => _cancel(),
+        onTapCancel: () => _cancel(),
+        onTap: () {
+          // A quick tap (no hold) shouldn't fire the action — instead hint
+          // the user that a press-and-hold is required. Skip the hint when a
+          // full hold just completed (the action already fired).
+          if (_confirmed) return;
+          final hint = widget.tooltip?.replaceFirst('Hold to', 'Press and hold to');
+          if (hint != null) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hint), duration: const Duration(seconds: 1)));
+          }
+        },
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: Stack(
+            // Allow the ring to overflow the button so a finger resting on it
+            // doesn't obscure the animation.
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              // Large, obvious ring drawn only while the user is holding
+              // (value > 0). When idle it's invisible, so the button looks
+              // like a normal FAB until pressed.
+              if (_controller.value > 0)
+                SizedBox(
+                  width: 512,
+                  height: 512,
+                  child: AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, _) => CircularProgressIndicator(
+                      value: _controller.value,
+                      strokeWidth: 64,
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest.withAlpha(128),
+                      valueColor: AlwaysStoppedAnimation(widget.iconColor),
+                    ),
+                  ),
+                ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: widget.backgroundColor),
+                child: Icon(widget.icon, color: widget.iconColor, size: 20),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
