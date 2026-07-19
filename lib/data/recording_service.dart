@@ -44,6 +44,9 @@ class RecordingService {
   bool _hasGps = false;
   DateTime? _tickStart;
 
+  /// Called after every ride start or stop so the UI can refresh.
+  VoidCallback? onRideMutation;
+
   /// Exposes the current recording state for the UI.
   Stream<RecordingState> get stateStream => _stateController.stream;
 
@@ -89,6 +92,8 @@ class RecordingService {
       debugPrint('[RecordingService] inserted new ride #$newId');
     }
 
+    onRideMutation?.call();
+
     // Defer GPS to the next microtask so the UI can render the recording state
     // before the potentially-blocking platform channel call.
     Future.microtask(() {
@@ -117,13 +122,14 @@ class RecordingService {
   Future<void> stop() async {
     if (!_state.isActive) return;
 
-    debugPrint('[RecordingService] stopping');
+    final rideId = _state.rideId;
+    debugPrint('[RecordingService] stopping ride #$rideId');
 
     _telemetrySub?.cancel();
     _telemetrySub = null;
 
     // Finalize the ride row.
-    await (_db.update(_db.rides)..where((r) => r.id.equals(_state.rideId!))).write(
+    await (_db.update(_db.rides)..where((r) => r.id.equals(rideId!))).write(
       RidesCompanion(
         endTime: Value(DateTime.now()),
         timeInMotion: Value(_state.timeInMotion.inSeconds.toDouble()),
@@ -131,9 +137,16 @@ class RecordingService {
         elevationGainM: Value(_state.elevationGainM),
       ),
     );
+    debugPrint('[RecordingService] ride #$rideId finalized in DB');
 
-    _state = _state.copyWith(status: RecordingStatus.idle, rideId: null);
+    // Reset specific state fields only
+    // _state = _state.copyWith(status: RecordingStatus.idle, rideId: null, timeInMotion: Duration.zero, distanceKm: 0, elevationGainM: 0);
+    // Reset all state fields
+    _state = RecordingState();
     _stateController.add(_state);
+    debugPrint('[RecordingService] state emitted: idle, rideId=null');
+
+    onRideMutation?.call();
 
     // Stop foreground service.
     await FlutterForegroundTask.stopService();

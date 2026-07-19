@@ -125,6 +125,7 @@ class _RecordingControlBar extends ConsumerWidget {
             ),
           ],
         );
+      // This info is already shown in _RideConttent _TripStats
       //label = '${_formatDuration(rs.elapsed)}  ·  ${rs.distanceKm.toStringAsFixed(1)} km';
       case RecordingStatus.paused:
         button = Row(
@@ -320,11 +321,6 @@ class _RideContent extends ConsumerWidget {
       metrics.add(_SpeedTile(speedKmh: t.speedKmh));
     }
 
-    // -- Trip stats (shown while recording) --
-    if (rs != null && rs.isActive) {
-      metrics.add(_TripStatsTile(elapsed: rs.elapsed, distanceKm: rs.distanceKm, elevationGainM: rs.elevationGainM));
-    }
-
     // -- Secondary grid --
     final gridChildren = <Widget>[];
     if (t.ordValid) {
@@ -361,6 +357,11 @@ class _RideContent extends ConsumerWidget {
           child: _BatteryTile(soc: t.soc, voltage: t.batteryVoltage),
         ),
       );
+    }
+
+    // -- Trip stats (shown while recording) --
+    if (rs != null && rs.isActive) {
+      metrics.add(_TripStatsTile(elapsed: rs.elapsed, distanceKm: rs.distanceKm, elevationGainM: rs.elevationGainM));
     }
 
     return ListView(

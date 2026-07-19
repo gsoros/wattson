@@ -5,10 +5,23 @@ import '../data/database.dart';
 import '../providers/recording_provider.dart';
 
 /// All rides from the database, ordered by start time descending.
+///
+/// Re-fetches whenever [rideHistoryVersionProvider] is bumped (on every ride
+/// start or stop).
 final rideHistoryProvider = FutureProvider<List<Ride>>((ref) async {
+  // Watch the version counter so this provider re-evaluates on start/stop.
+  ref.watch(rideHistoryVersionProvider);
+
+  debugPrint('[rideHistoryProvider] re-fetching rides from database');
+
   final db = ref.watch(databaseProvider);
   final rides = await db.select(db.rides).get();
   rides.sort((a, b) => b.startTime.compareTo(a.startTime));
+
+  for (final r in rides) {
+    debugPrint('[rideHistoryProvider]   ride #${r.id}: endTime=${r.endTime}');
+  }
+
   return rides;
 });
 
