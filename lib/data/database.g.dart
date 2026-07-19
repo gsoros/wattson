@@ -154,6 +154,15 @@ class $RidesTable extends Rides with TableInfo<$RidesTable, Ride> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -169,6 +178,7 @@ class $RidesTable extends Rides with TableInfo<$RidesTable, Ride> {
     avgHrBpm,
     assistRatio,
     notes,
+    title,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -280,6 +290,12 @@ class $RidesTable extends Rides with TableInfo<$RidesTable, Ride> {
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
     return context;
   }
 
@@ -341,6 +357,10 @@ class $RidesTable extends Rides with TableInfo<$RidesTable, Ride> {
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      ),
     );
   }
 
@@ -364,6 +384,9 @@ class Ride extends DataClass implements Insertable<Ride> {
   final double? avgHrBpm;
   final double? assistRatio;
   final String? notes;
+
+  /// User-editable name for the ride. Null/empty falls back to a date label.
+  final String? title;
   const Ride({
     required this.id,
     required this.startTime,
@@ -378,6 +401,7 @@ class Ride extends DataClass implements Insertable<Ride> {
     this.avgHrBpm,
     this.assistRatio,
     this.notes,
+    this.title,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -410,6 +434,9 @@ class Ride extends DataClass implements Insertable<Ride> {
     }
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
     }
     return map;
   }
@@ -445,6 +472,9 @@ class Ride extends DataClass implements Insertable<Ride> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      title: title == null && nullToAbsent
+          ? const Value.absent()
+          : Value(title),
     );
   }
 
@@ -467,6 +497,7 @@ class Ride extends DataClass implements Insertable<Ride> {
       avgHrBpm: serializer.fromJson<double?>(json['avgHrBpm']),
       assistRatio: serializer.fromJson<double?>(json['assistRatio']),
       notes: serializer.fromJson<String?>(json['notes']),
+      title: serializer.fromJson<String?>(json['title']),
     );
   }
   @override
@@ -486,6 +517,7 @@ class Ride extends DataClass implements Insertable<Ride> {
       'avgHrBpm': serializer.toJson<double?>(avgHrBpm),
       'assistRatio': serializer.toJson<double?>(assistRatio),
       'notes': serializer.toJson<String?>(notes),
+      'title': serializer.toJson<String?>(title),
     };
   }
 
@@ -503,6 +535,7 @@ class Ride extends DataClass implements Insertable<Ride> {
     Value<double?> avgHrBpm = const Value.absent(),
     Value<double?> assistRatio = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    Value<String?> title = const Value.absent(),
   }) => Ride(
     id: id ?? this.id,
     startTime: startTime ?? this.startTime,
@@ -525,6 +558,7 @@ class Ride extends DataClass implements Insertable<Ride> {
     avgHrBpm: avgHrBpm.present ? avgHrBpm.value : this.avgHrBpm,
     assistRatio: assistRatio.present ? assistRatio.value : this.assistRatio,
     notes: notes.present ? notes.value : this.notes,
+    title: title.present ? title.value : this.title,
   );
   Ride copyWithCompanion(RidesCompanion data) {
     return Ride(
@@ -557,6 +591,7 @@ class Ride extends DataClass implements Insertable<Ride> {
           ? data.assistRatio.value
           : this.assistRatio,
       notes: data.notes.present ? data.notes.value : this.notes,
+      title: data.title.present ? data.title.value : this.title,
     );
   }
 
@@ -575,7 +610,8 @@ class Ride extends DataClass implements Insertable<Ride> {
           ..write('avgCadenceRpm: $avgCadenceRpm, ')
           ..write('avgHrBpm: $avgHrBpm, ')
           ..write('assistRatio: $assistRatio, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('title: $title')
           ..write(')'))
         .toString();
   }
@@ -595,6 +631,7 @@ class Ride extends DataClass implements Insertable<Ride> {
     avgHrBpm,
     assistRatio,
     notes,
+    title,
   );
   @override
   bool operator ==(Object other) =>
@@ -612,7 +649,8 @@ class Ride extends DataClass implements Insertable<Ride> {
           other.avgCadenceRpm == this.avgCadenceRpm &&
           other.avgHrBpm == this.avgHrBpm &&
           other.assistRatio == this.assistRatio &&
-          other.notes == this.notes);
+          other.notes == this.notes &&
+          other.title == this.title);
 }
 
 class RidesCompanion extends UpdateCompanion<Ride> {
@@ -629,6 +667,7 @@ class RidesCompanion extends UpdateCompanion<Ride> {
   final Value<double?> avgHrBpm;
   final Value<double?> assistRatio;
   final Value<String?> notes;
+  final Value<String?> title;
   const RidesCompanion({
     this.id = const Value.absent(),
     this.startTime = const Value.absent(),
@@ -643,6 +682,7 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     this.avgHrBpm = const Value.absent(),
     this.assistRatio = const Value.absent(),
     this.notes = const Value.absent(),
+    this.title = const Value.absent(),
   });
   RidesCompanion.insert({
     this.id = const Value.absent(),
@@ -658,6 +698,7 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     this.avgHrBpm = const Value.absent(),
     this.assistRatio = const Value.absent(),
     this.notes = const Value.absent(),
+    this.title = const Value.absent(),
   }) : startTime = Value(startTime);
   static Insertable<Ride> custom({
     Expression<int>? id,
@@ -673,6 +714,7 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     Expression<double>? avgHrBpm,
     Expression<double>? assistRatio,
     Expression<String>? notes,
+    Expression<String>? title,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -688,6 +730,7 @@ class RidesCompanion extends UpdateCompanion<Ride> {
       if (avgHrBpm != null) 'avg_hr_bpm': avgHrBpm,
       if (assistRatio != null) 'assist_ratio': assistRatio,
       if (notes != null) 'notes': notes,
+      if (title != null) 'title': title,
     });
   }
 
@@ -705,6 +748,7 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     Value<double?>? avgHrBpm,
     Value<double?>? assistRatio,
     Value<String?>? notes,
+    Value<String?>? title,
   }) {
     return RidesCompanion(
       id: id ?? this.id,
@@ -720,6 +764,7 @@ class RidesCompanion extends UpdateCompanion<Ride> {
       avgHrBpm: avgHrBpm ?? this.avgHrBpm,
       assistRatio: assistRatio ?? this.assistRatio,
       notes: notes ?? this.notes,
+      title: title ?? this.title,
     );
   }
 
@@ -765,6 +810,9 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
     return map;
   }
 
@@ -783,7 +831,8 @@ class RidesCompanion extends UpdateCompanion<Ride> {
           ..write('avgCadenceRpm: $avgCadenceRpm, ')
           ..write('avgHrBpm: $avgHrBpm, ')
           ..write('assistRatio: $assistRatio, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('title: $title')
           ..write(')'))
         .toString();
   }
@@ -1700,6 +1749,7 @@ typedef $$RidesTableCreateCompanionBuilder =
       Value<double?> avgHrBpm,
       Value<double?> assistRatio,
       Value<String?> notes,
+      Value<String?> title,
     });
 typedef $$RidesTableUpdateCompanionBuilder =
     RidesCompanion Function({
@@ -1716,6 +1766,7 @@ typedef $$RidesTableUpdateCompanionBuilder =
       Value<double?> avgHrBpm,
       Value<double?> assistRatio,
       Value<String?> notes,
+      Value<String?> title,
     });
 
 final class $$RidesTableReferences
@@ -1812,6 +1863,11 @@ class $$RidesTableFilterComposer extends Composer<_$AppDatabase, $RidesTable> {
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1914,6 +1970,11 @@ class $$RidesTableOrderingComposer
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$RidesTableAnnotationComposer
@@ -1979,6 +2040,9 @@ class $$RidesTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
 
   Expression<T> samplesRefs<T extends Object>(
     Expression<T> Function($$SamplesTableAnnotationComposer a) f,
@@ -2047,6 +2111,7 @@ class $$RidesTableTableManager
                 Value<double?> avgHrBpm = const Value.absent(),
                 Value<double?> assistRatio = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<String?> title = const Value.absent(),
               }) => RidesCompanion(
                 id: id,
                 startTime: startTime,
@@ -2061,6 +2126,7 @@ class $$RidesTableTableManager
                 avgHrBpm: avgHrBpm,
                 assistRatio: assistRatio,
                 notes: notes,
+                title: title,
               ),
           createCompanionCallback:
               ({
@@ -2077,6 +2143,7 @@ class $$RidesTableTableManager
                 Value<double?> avgHrBpm = const Value.absent(),
                 Value<double?> assistRatio = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<String?> title = const Value.absent(),
               }) => RidesCompanion.insert(
                 id: id,
                 startTime: startTime,
@@ -2091,6 +2158,7 @@ class $$RidesTableTableManager
                 avgHrBpm: avgHrBpm,
                 assistRatio: assistRatio,
                 notes: notes,
+                title: title,
               ),
           withReferenceMapper: (p0) => p0
               .map(

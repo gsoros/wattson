@@ -7,12 +7,33 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../data/database.dart';
+import '../util/ride_title_generator.dart';
 import '../models/recording_state.dart';
 import '../models/telemetry.dart';
 import '../service/recording_task_handler.dart';
 
 /// Threshold below which the bike is considered stopped (km/h).
 const double _motionThreshold = 2.0;
+
+/// Computed summary statistics for a ride, ready to write into a
+/// [RidesCompanion].
+class _RideStats {
+  const _RideStats({
+    required this.avgHumanPowerW,
+    required this.maxHumanPowerW,
+    required this.avgMotorPowerW,
+    required this.avgCadenceRpm,
+    required this.avgHrBpm,
+    required this.assistRatio,
+  });
+
+  final Value<double?> avgHumanPowerW;
+  final Value<double?> maxHumanPowerW;
+  final Value<double?> avgMotorPowerW;
+  final Value<double?> avgCadenceRpm;
+  final Value<double?> avgHrBpm;
+  final Value<double?> assistRatio;
+}
 
 /// Manages ride recording lifecycle.
 ///
@@ -128,6 +149,27 @@ class RecordingService {
     _telemetrySub?.cancel();
     _telemetrySub = null;
 
+    // Fetch samples to compute summary stats (power/cadence/HR/assist ratio).
+    final samples = await (_db.select(_db.samples)..where((s) => s.rideId.equals(rideId!))).get();
+    final stats = _computeRideStats(samples);
+
+    // Read the existing ride so we don't overwrite a title the user may have
+    // set on a previously resumed orphan ride.
+    final existing = await (_db.select(_db.rides)..where((r) => r.id.equals(rideId!))).getSingle();
+
+    // Build a view of the ride with the freshly computed stats so the
+    // auto-generated title can be effort-aware (power/climb/assist based).
+    final finalized = existing.copyWith(
+      distanceKm: _state.distanceKm,
+      elevationGainM: _state.elevationGainM,
+      avgHumanPowerW: Value(stats.avgHumanPowerW.value),
+      maxHumanPowerW: Value(stats.maxHumanPowerW.value),
+      avgMotorPowerW: Value(stats.avgMotorPowerW.value),
+      avgCadenceRpm: Value(stats.avgCadenceRpm.value),
+      avgHrBpm: Value(stats.avgHrBpm.value),
+      assistRatio: Value(stats.assistRatio.value),
+    );
+
     // Finalize the ride row.
     await (_db.update(_db.rides)..where((r) => r.id.equals(rideId!))).write(
       RidesCompanion(
@@ -135,6 +177,14 @@ class RecordingService {
         timeInMotion: Value(_state.timeInMotion.inSeconds.toDouble()),
         distanceKm: Value(_state.distanceKm),
         elevationGainM: Value(_state.elevationGainM),
+        avgHumanPowerW: stats.avgHumanPowerW,
+        maxHumanPowerW: stats.maxHumanPowerW,
+        avgMotorPowerW: stats.avgMotorPowerW,
+        avgCadenceRpm: stats.avgCadenceRpm,
+        avgHrBpm: stats.avgHrBpm,
+        assistRatio: stats.assistRatio,
+        // Auto-generate a cheeky/motivational title unless one already exists.
+        title: existing.title?.isNotEmpty == true ? const Value.absent() : Value(generateRideTitle(finalized)),
       ),
     );
     debugPrint('[RecordingService] ride #$rideId finalized in DB');
@@ -156,6 +206,77 @@ class RecordingService {
     _gpsSub = null;
 
     debugPrint('[RecordingService] stopped');
+  }
+
+  /// Computes summary statistics from a ride's telemetry samples.
+  ///
+  /// Averages are taken over all samples (the ~1 Hz CTS tick rate makes a
+  /// simple mean representative). [assistRatio] is the mean human/motor power
+  /// ratio; it is null when no motor power was recorded. Returns [Value]s so
+  /// the result can be dropped straight into a [RidesCompanion] (null when
+  /// there are no samples).
+  _RideStats _computeRideStats(List<Sample> samples) {
+    if (samples.isEmpty) {
+      return const _RideStats(
+        avgHumanPowerW: Value(null),
+        maxHumanPowerW: Value(null),
+        avgMotorPowerW: Value(null),
+        avgCadenceRpm: Value(null),
+        avgHrBpm: Value(null),
+        assistRatio: Value(null),
+      );
+    }
+
+    double totalHuman = 0;
+    double maxHuman = 0;
+    double totalMotor = 0;
+    double totalCadence = 0;
+    double totalHr = 0;
+    int hrCount = 0;
+    double totalRatio = 0;
+    int ratioCount = 0;
+
+    for (final s in samples) {
+      totalHuman += s.humanPowerW;
+      if (s.humanPowerW > maxHuman) maxHuman = s.humanPowerW;
+      totalMotor += s.motorPowerW;
+      totalCadence += s.cadenceRpm;
+      if (s.hrBpm > 0) {
+        totalHr += s.hrBpm;
+        hrCount++;
+      }
+      if (s.motorPowerW > 0) {
+        totalRatio += s.humanPowerW / s.motorPowerW;
+        ratioCount++;
+      }
+    }
+
+    final n = samples.length.toDouble();
+    return _RideStats(
+      avgHumanPowerW: Value(totalHuman / n),
+      maxHumanPowerW: Value(maxHuman),
+      avgMotorPowerW: Value(totalMotor / n),
+      avgCadenceRpm: Value(totalCadence / n),
+      avgHrBpm: Value(hrCount > 0 ? totalHr / hrCount : null),
+      assistRatio: Value(ratioCount > 0 ? totalRatio / ratioCount : null),
+    );
+  }
+
+  /// Permanently delete a ride and all of its telemetry samples.
+  ///
+  /// Runs inside a transaction so the ride and its samples are removed
+  /// atomically. Drift executes the query on a background isolate, so this
+  /// does not block the UI thread even for long rides with many samples.
+  ///
+  /// Bumps [onRideMutation] so the ride history list re-fetches.
+  Future<void> deleteRide(int rideId) async {
+    debugPrint('[RecordingService] deleting ride #$rideId and its samples');
+    await _db.transaction(() async {
+      await (_db.delete(_db.samples)..where((s) => s.rideId.equals(rideId))).go();
+      await (_db.delete(_db.rides)..where((r) => r.id.equals(rideId))).go();
+    });
+    debugPrint('[RecordingService] ride #$rideId deleted');
+    onRideMutation?.call();
   }
 
   /// Check for an orphan ride (endTime == null) left from a previous session.
@@ -209,12 +330,8 @@ class RecordingService {
       final allSamples = await (_db.select(_db.samples)..where((s) => s.rideId.equals(ride.id))).get();
       double totalDistance = 0;
       double totalElevation = 0;
-      double totalHumanPower = 0;
-      double totalMotorPower = 0;
-      int totalCadence = 0;
-      int sampleCount = allSamples.length;
 
-      for (int i = 0; i < sampleCount; i++) {
+      for (int i = 0; i < allSamples.length; i++) {
         final s = allSamples[i];
         if (s.speedKmh > _motionThreshold && i > 0) {
           final dt = s.ts.difference(allSamples[i - 1].ts).inMilliseconds / 3600000.0;
@@ -226,14 +343,9 @@ class RecordingService {
             totalElevation += (s.elevation! - prev).clamp(0, double.infinity);
           }
         }
-        totalHumanPower += s.humanPowerW;
-        totalMotorPower += s.motorPowerW;
-        totalCadence += s.cadenceRpm;
       }
 
-      final avgHumanPower = sampleCount > 0 ? totalHumanPower / sampleCount : null;
-      final avgMotorPower = sampleCount > 0 ? totalMotorPower / sampleCount : null;
-      final avgCadence = sampleCount > 0 ? totalCadence / sampleCount : null;
+      final stats = _computeRideStats(allSamples);
 
       await (_db.update(_db.rides)..where((r) => r.id.equals(ride.id))).write(
         RidesCompanion(
@@ -241,9 +353,12 @@ class RecordingService {
           timeInMotion: Value(lastSampleTs.difference(ride.startTime).inSeconds.toDouble()),
           distanceKm: Value(totalDistance),
           elevationGainM: Value(totalElevation),
-          avgHumanPowerW: Value(avgHumanPower),
-          avgMotorPowerW: Value(avgMotorPower),
-          avgCadenceRpm: Value(avgCadence?.toDouble()),
+          avgHumanPowerW: stats.avgHumanPowerW,
+          maxHumanPowerW: stats.maxHumanPowerW,
+          avgMotorPowerW: stats.avgMotorPowerW,
+          avgCadenceRpm: stats.avgCadenceRpm,
+          avgHrBpm: stats.avgHrBpm,
+          assistRatio: stats.assistRatio,
         ),
       );
     }

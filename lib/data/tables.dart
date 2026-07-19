@@ -15,6 +15,9 @@ class Rides extends Table {
   RealColumn get avgHrBpm => real().nullable()();
   RealColumn get assistRatio => real().nullable()();
   TextColumn get notes => text().nullable()();
+
+  /// User-editable name for the ride. Null/empty falls back to a date label.
+  TextColumn get title => text().nullable()();
 }
 
 /// A single telemetry sample within a ride.

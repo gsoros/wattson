@@ -70,12 +70,12 @@ class _MainShellState extends State<_MainShell> {
     super.dispose();
   }
 
-  void _showHistory() {
-    _pageController.animateToPage(1, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+  void _showMainPage() {
+    _pageController.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
   }
 
-  void _showRideScreen() {
-    _pageController.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+  void _showHistory() {
+    _pageController.animateToPage(1, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
   }
 
   @override
@@ -84,7 +84,7 @@ class _MainShellState extends State<_MainShell> {
       controller: _pageController,
       children: [
         MainPage(onShowHistory: _showHistory),
-        RideHistoryPage(onNavigateBack: _showRideScreen),
+        RideHistoryPage(onNavigateBack: _showMainPage),
       ],
     );
   }

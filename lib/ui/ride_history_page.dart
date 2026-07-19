@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database.dart';
 import '../providers/recording_provider.dart';
+import 'ride_details_page.dart';
 
 /// All rides from the database, ordered by start time descending.
 ///
@@ -96,20 +97,28 @@ class _RideCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          // TODO: navigate to ride detail page (M6 Export)
+          // The ride currently "in progress" (endTime == null) is not opened.
+          if (ride.endTime == null) return;
+          Navigator.of(context).push(_scaleRoute(RideDetailsPage(ride: ride)));
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Date + status badge
+              // Title + status badge
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.calendar_today, size: 14, color: theme.colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 6),
-                  Text('$dateStr  $timeStr', style: theme.textTheme.titleSmall),
-                  const Spacer(),
+                  Expanded(
+                    child: Text(
+                      ride.title?.isNotEmpty == true ? ride.title! : '$dateStr  $timeStr',
+                      style: theme.textTheme.titleSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   if (ride.endTime == null)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -118,6 +127,11 @@ class _RideCard extends StatelessWidget {
                     ),
                 ],
               ),
+              if (ride.title?.isNotEmpty == true)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text('$dateStr  $timeStr', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                ),
               const SizedBox(height: 12),
               // Stats row
               Row(
@@ -180,4 +194,22 @@ class _Stat extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A route that scales the page up from the center on push and scales it back
+/// down on pop, giving a subtle zoom-in / zoom-out effect.
+Route<T> _scaleRoute<T>(Widget page) {
+  return PageRouteBuilder<T>(
+    pageBuilder: (context, animation, secondaryAnimation) => page,
+    transitionDuration: const Duration(milliseconds: 250),
+    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final scale = Tween<double>(begin: 0.92, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)).animate(animation);
+      final fade = Tween<double>(begin: 0.0, end: 1.0).animate(animation);
+      return FadeTransition(
+        opacity: fade,
+        child: ScaleTransition(scale: scale, child: child),
+      );
+    },
+  );
 }
