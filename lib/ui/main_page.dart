@@ -12,8 +12,8 @@ import 'settings_page.dart';
 ///
 /// Shows ORD Dash telemetry and HRM heart rate in a clean card layout, with
 /// recording controls at the bottom.
-class RidePage extends ConsumerWidget {
-  const RidePage({super.key, this.onShowHistory});
+class MainPage extends ConsumerWidget {
+  const MainPage({super.key, this.onShowHistory});
 
   /// Called when the user wants to navigate to the ride history page.
   final VoidCallback? onShowHistory;
