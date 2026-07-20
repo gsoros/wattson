@@ -19,8 +19,8 @@ String formatRideDate(DateTime dt) {
 
 /// Detail view for a single recorded ride.
 ///
-/// Shows all known ride metrics, an editable title and notes field, and a
-/// delete action. Map and Graphs tabs are stubbed for a later version.
+/// Shows all known ride metrics, an editable title and notes field, a
+/// delete action, and an embedded map with the optional overlay graph.
 class RideDetailsPage extends ConsumerStatefulWidget {
   const RideDetailsPage({super.key, required this.ride});
 
@@ -162,6 +162,7 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
   Widget build(BuildContext context) {
     final ride = _ride;
     final duration = ride.endTime?.difference(ride.startTime);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -199,114 +200,78 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
           ),
         ],
       ),
-      body: DefaultTabController(
-        length: 3,
-        child: Column(
-          children: [
-            const TabBar(
-              tabs: [
-                Tab(text: 'Details'),
-                Tab(text: 'Map'),
-                Tab(text: 'Graphs'),
-              ],
-            ),
-            Expanded(
-              child: TabBarView(
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextField(
+            controller: _titleController,
+            focusNode: _titleFocus,
+            decoration: const InputDecoration(labelText: 'Title', hintText: 'Name this ride', border: OutlineInputBorder()),
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _DetailsTab(
-                    ride: ride,
-                    duration: duration,
-                    titleController: _titleController,
-                    notesController: _notesController,
-                    titleFocus: _titleFocus,
-                    notesFocus: _notesFocus,
+                  Text('Summary', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 12),
+                  _MetricRow(icon: Icons.calendar_today, label: 'Date', value: formatRideDate(ride.startTime)),
+                  _MetricRow(icon: Icons.timer, label: 'Duration', value: duration != null ? _formatDuration(duration) : '—'),
+                  _MetricRow(icon: Icons.straighten, label: 'Distance', value: '${ride.distanceKm.toStringAsFixed(1)} km'),
+                  _MetricRow(icon: Icons.terrain, label: 'Elevation gain', value: '${ride.elevationGainM.toStringAsFixed(0)} m'),
+                  _MetricRow(
+                    icon: Icons.bolt,
+                    label: 'Avg human power',
+                    value: ride.avgHumanPowerW != null ? '${ride.avgHumanPowerW!.toStringAsFixed(0)} W' : '—',
                   ),
-                  RideMapTab(ride: ride, samples: _samples),
-                  const Center(child: Text('Graphs coming soon')),
+                  _MetricRow(
+                    icon: Icons.bolt,
+                    label: 'Max human power',
+                    value: ride.maxHumanPowerW != null ? '${ride.maxHumanPowerW!.toStringAsFixed(0)} W' : '—',
+                  ),
+                  _MetricRow(
+                    icon: Icons.electric_bolt,
+                    label: 'Avg motor power',
+                    value: ride.avgMotorPowerW != null ? '${ride.avgMotorPowerW!.toStringAsFixed(0)} W' : '—',
+                  ),
+                  _MetricRow(icon: Icons.sync, label: 'Avg cadence', value: ride.avgCadenceRpm != null ? '${ride.avgCadenceRpm!.toStringAsFixed(0)} rpm' : '—'),
+                  _MetricRow(icon: Icons.favorite, label: 'Avg heart rate', value: ride.avgHrBpm != null ? '${ride.avgHrBpm!.toStringAsFixed(0)} bpm' : '—'),
+                  _MetricRow(icon: Icons.balance, label: 'Assist ratio', value: ride.assistRatio != null ? ride.assistRatio!.toStringAsFixed(2) : '—'),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailsTab extends StatelessWidget {
-  const _DetailsTab({
-    required this.ride,
-    required this.duration,
-    required this.titleController,
-    required this.notesController,
-    required this.titleFocus,
-    required this.notesFocus,
-  });
-
-  final Ride ride;
-  final Duration? duration;
-  final TextEditingController titleController;
-  final TextEditingController notesController;
-  final FocusNode titleFocus;
-  final FocusNode notesFocus;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        TextField(
-          controller: titleController,
-          focusNode: titleFocus,
-          decoration: const InputDecoration(labelText: 'Title', hintText: 'Name this ride', border: OutlineInputBorder()),
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Summary', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 12),
-                _MetricRow(icon: Icons.calendar_today, label: 'Date', value: formatRideDate(ride.startTime)),
-                _MetricRow(icon: Icons.timer, label: 'Duration', value: duration != null ? _formatDuration(duration!) : '—'),
-                _MetricRow(icon: Icons.straighten, label: 'Distance', value: '${ride.distanceKm.toStringAsFixed(1)} km'),
-                _MetricRow(icon: Icons.terrain, label: 'Elevation gain', value: '${ride.elevationGainM.toStringAsFixed(0)} m'),
-                _MetricRow(
-                  icon: Icons.bolt,
-                  label: 'Avg human power',
-                  value: ride.avgHumanPowerW != null ? '${ride.avgHumanPowerW!.toStringAsFixed(0)} W' : '—',
-                ),
-                _MetricRow(
-                  icon: Icons.bolt,
-                  label: 'Max human power',
-                  value: ride.maxHumanPowerW != null ? '${ride.maxHumanPowerW!.toStringAsFixed(0)} W' : '—',
-                ),
-                _MetricRow(
-                  icon: Icons.electric_bolt,
-                  label: 'Avg motor power',
-                  value: ride.avgMotorPowerW != null ? '${ride.avgMotorPowerW!.toStringAsFixed(0)} W' : '—',
-                ),
-                _MetricRow(icon: Icons.sync, label: 'Avg cadence', value: ride.avgCadenceRpm != null ? '${ride.avgCadenceRpm!.toStringAsFixed(0)} rpm' : '—'),
-                _MetricRow(icon: Icons.favorite, label: 'Avg heart rate', value: ride.avgHrBpm != null ? '${ride.avgHrBpm!.toStringAsFixed(0)} bpm' : '—'),
-                _MetricRow(icon: Icons.balance, label: 'Assist ratio', value: ride.assistRatio != null ? ride.assistRatio!.toStringAsFixed(2) : '—'),
-              ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _notesController,
+            focusNode: _notesFocus,
+            decoration: const InputDecoration(
+              labelText: 'Notes',
+              hintText: 'Add notes about this ride',
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+            // Single line by default; grows vertically as content is added.
+            minLines: 1,
+            maxLines: null,
+            textInputAction: TextInputAction.newline,
+          ),
+          const SizedBox(height: 16),
+          // Embedded map with the optional overlay graph. Sized to fill the
+          // visible scroll area (screen minus app bar and status bar) minus a
+          // small gap, so it occupies most of the view when scrolled to bottom.
+          SizedBox(
+            height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - kToolbarHeight - 10,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: RideMapTab(ride: ride, samples: _samples),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: notesController,
-          focusNode: notesFocus,
-          decoration: const InputDecoration(labelText: 'Notes', hintText: 'Add notes about this ride', border: OutlineInputBorder(), alignLabelWithHint: true),
-          maxLines: 6,
-          textInputAction: TextInputAction.newline,
-        ),
-      ],
+        ],
+      ),
     );
   }
 

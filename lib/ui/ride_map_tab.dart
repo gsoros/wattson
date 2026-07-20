@@ -29,11 +29,13 @@ class _RideMapTabState extends State<RideMapTab> {
   final MapController _mapController = MapController();
 
   /// GPS-valid track points, aligned to [widget.samples].
-  late final List<LatLng> _points;
-  late final List<Sample> _gpsSamples;
+  List<LatLng> _points = const [];
+
+  /// GPS-valid samples, aligned to [_points].
+  List<Sample> _gpsSamples = const [];
 
   /// Cumulative distance (km) per GPS-valid sample, aligned to [_points].
-  late final List<double> _distances;
+  List<double> _distances = const [];
 
   bool _showSettings = false;
 

@@ -266,7 +266,7 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 | M4 | Recording (Drift DB, RecordingService, start/pause/stop, GPS) | **DONE** |
 | M5 | Foreground service + background recording | **DONE** |
 | M6 | Export (GPX + share_plus; CSV deferred) | **GPX DONE** |
-| M6b | Ride details Map tab (flutter_map, OpenCycleMap/OSM) | **Map DONE; Graphs STUBBED** |
+| M6b | Ride details, map, and graphs (flutter_map, OpenCycleMap/OSM) | **DONE** |
 | M6c | Navigation + UX polish: pure Navigator (drop PageView), swipe gestures, full-screen mode, REC indicator, custom launcher icon, bundle id `org.gsoros.wattson` | **DONE (2026-07-20)** |
 | M7 | Device config (Wi-Fi, hostname, etc. via NUS) | |
 | M8 | Permissions, iOS pass, tests, polish |

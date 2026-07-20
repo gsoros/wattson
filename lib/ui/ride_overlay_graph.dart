@@ -19,8 +19,9 @@ import '../data/database.dart';
 ///    dot on the map to the matching GPS fix.
 ///  * Pinch        → zooms the visible distance window around the focal point;
 ///    the parent zooms the map to the same range.
-///  * Long-press   → defines a range: the first long-press sets the start, the
-///    second sets the end; the view zooms to that range.
+///  * Long-press + horizontal drag → defines a range: the long-press anchors
+///    the start, the drag extends the end; on release the view zooms to that
+///    range (a live highlight shows the selection while dragging).
 ///  * Double-tap   → resets the view to the full ride range.
 class RideOverlayGraph extends StatefulWidget {
   const RideOverlayGraph({
@@ -83,8 +84,10 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
   // Cursor distance (km), or null when not yet placed.
   double? _cursorDist;
 
-  // Range-select state (set by long-press).
+  // Range-select state: set by a long-press (anchor) and updated by the
+  // subsequent horizontal drag. Both are non-null only while selecting.
   double? _rangeStart;
+  double? _rangeEnd;
 
   @override
   void initState() {
@@ -202,6 +205,7 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
       _viewStart = 0;
       _viewEnd = _totalDistance;
       _rangeStart = null;
+      _rangeEnd = null;
     });
     widget.onResetView();
   }
@@ -235,19 +239,29 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
           },
           onDoubleTap: _resetView,
           onLongPressStart: (d) {
+            // Anchor the range at the long-press point; the following
+            // horizontal drag extends it.
             final km = _xToDistance(d.localPosition.dx, plotLeft, plotRight);
-            if (_rangeStart == null) {
-              setState(() => _rangeStart = km);
-            } else {
-              final start = math.min(_rangeStart!, km);
-              final end = math.max(_rangeStart!, km);
-              setState(() {
-                _viewStart = start;
-                _viewEnd = end;
-                _rangeStart = null;
-              });
-              widget.onViewRangeChanged(_viewStart, _viewEnd);
-            }
+            setState(() {
+              _rangeStart = km;
+              _rangeEnd = km;
+            });
+          },
+          onLongPressMoveUpdate: (d) {
+            if (_rangeStart == null) return;
+            setState(() => _rangeEnd = _xToDistance(d.localPosition.dx, plotLeft, plotRight));
+          },
+          onLongPressEnd: (d) {
+            if (_rangeStart == null || _rangeEnd == null) return;
+            final start = math.min(_rangeStart!, _rangeEnd!);
+            final end = math.max(_rangeStart!, _rangeEnd!);
+            setState(() {
+              _viewStart = start;
+              _viewEnd = end;
+              _rangeStart = null;
+              _rangeEnd = null;
+            });
+            widget.onViewRangeChanged(_viewStart, _viewEnd);
           },
           child: Container(
             height: height,
@@ -263,6 +277,7 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
                 viewEnd: _viewEnd,
                 cursorDist: _cursorDist,
                 rangeStart: _rangeStart,
+                rangeEnd: _rangeEnd,
                 metric1: widget.metric1,
                 metric2: widget.metric2,
                 series1: _series1,
@@ -296,6 +311,7 @@ class _GraphPainter extends CustomPainter {
     required this.viewEnd,
     required this.cursorDist,
     required this.rangeStart,
+    required this.rangeEnd,
     required this.metric1,
     required this.metric2,
     required this.series1,
@@ -319,6 +335,7 @@ class _GraphPainter extends CustomPainter {
   final double viewEnd;
   final double? cursorDist;
   final double? rangeStart;
+  final double? rangeEnd;
   final GraphMetric metric1;
   final GraphMetric metric2;
   final List<double> series1;
@@ -390,10 +407,12 @@ class _GraphPainter extends CustomPainter {
       }
     }
 
-    // Range-select highlight.
-    if (rangeStart != null) {
-      final x0 = _x(math.min(rangeStart!, viewStart), plotTop, plotBottom);
-      final x1 = _x(math.max(rangeStart!, viewEnd), plotTop, plotBottom);
+    // Range-select highlight (live while long-pressing + dragging).
+    if (rangeStart != null && rangeEnd != null) {
+      final lo = math.min(rangeStart!, rangeEnd!);
+      final hi = math.max(rangeStart!, rangeEnd!);
+      final x0 = _x(lo, plotTop, plotBottom);
+      final x1 = _x(hi, plotTop, plotBottom);
       final hl = Paint()..color = color1.withAlpha(40);
       canvas.drawRect(Rect.fromLTRB(x0, plotTop, x1, plotBottom), hl);
     }
@@ -529,6 +548,7 @@ class _GraphPainter extends CustomPainter {
       old.viewEnd != viewEnd ||
       old.cursorDist != cursorDist ||
       old.rangeStart != rangeStart ||
+      old.rangeEnd != rangeEnd ||
       old.metric1 != metric1 ||
       old.metric2 != metric2 ||
       old.distances != distances ||
