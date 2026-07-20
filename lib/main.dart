@@ -5,9 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/map_config.dart';
 import 'providers/ble_provider.dart';
 import 'ui/main_page.dart';
+import 'util/app_log.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Capture debugPrint + uncaught errors to a persistent file so crashes can
+  // be reproduced/diagnosed later (shared from Settings).
+  AppLog.init();
 
   // Load the persisted Thunderforest API key for the Map tab before the UI
   // renders, so the first map view uses the correct tile source.

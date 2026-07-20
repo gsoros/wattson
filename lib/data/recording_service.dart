@@ -210,11 +210,13 @@ class RecordingService {
 
   /// Computes summary statistics from a ride's telemetry samples.
   ///
-  /// Averages are taken over all samples (the ~1 Hz CTS tick rate makes a
-  /// simple mean representative). [assistRatio] is the mean human/motor power
-  /// ratio; it is null when no motor power was recorded. Returns [Value]s so
-  /// the result can be dropped straight into a [RidesCompanion] (null when
-  /// there are no samples).
+  /// Averages are taken over **moving** samples only (speed above
+  /// [_motionThreshold]); stationary samples read ~0 for human/motor power and
+  /// cadence and would otherwise dilute the mean. This matches how distance and
+  /// time-in-motion are already computed. [assistRatio] is the mean
+  /// human/motor power ratio over moving samples; it is null when no motor
+  /// power was recorded. Returns [Value]s so the result can be dropped straight
+  /// into a [RidesCompanion] (null when there are no moving samples).
   _RideStats _computeRideStats(List<Sample> samples) {
     if (samples.isEmpty) {
       return const _RideStats(
@@ -235,8 +237,14 @@ class RecordingService {
     int hrCount = 0;
     double totalRatio = 0;
     int ratioCount = 0;
+    int movingCount = 0;
 
     for (final s in samples) {
+      // Skip stationary samples so their ~0 power/cadence don't dilute the
+      // averages (distance and time-in-motion already use this rule).
+      if (s.speedKmh <= _motionThreshold) continue;
+      movingCount++;
+
       totalHuman += s.humanPowerW;
       if (s.humanPowerW > maxHuman) maxHuman = s.humanPowerW;
       totalMotor += s.motorPowerW;
@@ -251,12 +259,22 @@ class RecordingService {
       }
     }
 
-    final n = samples.length.toDouble();
+    if (movingCount == 0) {
+      return const _RideStats(
+        avgHumanPowerW: Value(null),
+        maxHumanPowerW: Value(null),
+        avgMotorPowerW: Value(null),
+        avgCadenceRpm: Value(null),
+        avgHrBpm: Value(null),
+        assistRatio: Value(null),
+      );
+    }
+
     return _RideStats(
-      avgHumanPowerW: Value(totalHuman / n),
+      avgHumanPowerW: Value(totalHuman / movingCount),
       maxHumanPowerW: Value(maxHuman),
-      avgMotorPowerW: Value(totalMotor / n),
-      avgCadenceRpm: Value(totalCadence / n),
+      avgMotorPowerW: Value(totalMotor / movingCount),
+      avgCadenceRpm: Value(totalCadence / movingCount),
       avgHrBpm: Value(hrCount > 0 ? totalHr / hrCount : null),
       assistRatio: Value(ratioCount > 0 ? totalRatio / ratioCount : null),
     );

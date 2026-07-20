@@ -7,6 +7,7 @@ import '../ble/ble_service.dart';
 import '../ble/ble_scan_result.dart';
 import '../config/map_config.dart';
 import '../providers/ble_provider.dart';
+import '../util/app_log.dart';
 
 /// Settings page showing BLE scan results with connect/disconnect controls.
 class SettingsPage extends ConsumerStatefulWidget {
@@ -51,6 +52,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       appBar: AppBar(
         title: const Text('Settings'),
         actions: [
+          IconButton(icon: const Icon(Icons.bug_report), tooltip: 'Share diagnostic log', onPressed: () => AppLog.share()),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Rescan',
