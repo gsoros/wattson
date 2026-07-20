@@ -185,17 +185,18 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
   GPX covers the primary export path).
 - Manual `share_plus` OS sheet; no cloud/accounts.
 
-## Phase 6b — Ride details: Map tab DONE
+## Phase 6b — Ride details: Map tab (Map DONE, Graphs STUBBED)
 
 - `lib/ui/ride_details_page.dart` shows a 3-tab view: Details, **Map**, Graphs.
 - `lib/ui/ride_map_tab.dart` renders the recorded GPS track with `flutter_map`
   (v8, OSM-based, vendor-free): a `PolylineLayer` over a `TileLayer`, with
   zoom/pan via `InteractionOptions(flags: InteractiveFlag.all)` and a
-  `RichAttributionWidget` (bottom-right).
+  `RichAttributionWidget` (bottom-right). **Map tab is DONE.**
+- **Graphs tab is STUBBED** ("Graphs coming soon") — not yet implemented.
 - `lib/config/map_config.dart` centralizes tile sources: **OpenCycleMap**
   (Thunderforest `cycle` style) when a free API key is set, otherwise an
   **OpenStreetMap** no-key fallback. Both require a valid `userAgentPackageName`
-  (`app.wattson.wattson`). Attribution string switches accordingly.
+  (`org.gsoros.wattson`). Attribution string switches accordingly.
 - The Thunderforest API key is entered on the **Settings** page
   (`_ApiKeyCard`), persisted via `SharedPreferences` (`thunderforest_api_key`),
   loaded at startup in `main` via `MapConfig.load()`, and saved (debounced)
@@ -206,6 +207,31 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
   centers on that point at a fixed zoom (instead of `CameraFit.bounds`, which
   would compute a non-finite zoom and crash). `CameraFit.bounds` also gets a
   `maxZoom` cap as a safety net.
+
+## Phase 6c — Navigation & UX polish (2026-07-20) DONE
+
+- **Navigation is pure `Navigator`** (the earlier `PageView`/`_MainShell` hybrid
+  was removed). `MainPage` is the app `home`; `RideHistoryPage`, `SettingsPage`,
+  and `_FullScreenPage` are pushed via `Navigator.push(MaterialPageRoute)`. System
+  back / swipe-back on History & Settings pops correctly to `MainPage`.
+- **Swipe gestures** (`GestureDetector.onHorizontalDragEnd`):
+  - `MainPage` body swipe **left** → opens History (same as the history icon).
+  - `RideHistoryPage` swipe **right** → pops back to `MainPage`.
+- **Full-screen mode:** double-tap on the `MainPage` metrics content opens
+  `_FullScreenPage` (no AppBar, no controls bar; reuses `_RideContent` with
+  `bottomPadding: 0`). Double-tap or system back exits it.
+- **REC indicator:** `_TripStatsTile` now leads with a red `fiber_manual_record`
+  icon + `REC` label while recording.
+- **Bundle id** changed to `org.gsoros.wattson` across Android
+  (`android/app/build.gradle.kts`, `MainActivity.kt` package), iOS
+  (`project.pbxproj` `PRODUCT_BUNDLE_IDENTIFIER`), Linux (`CMakeLists.txt`
+  `APPLICATION_ID`), and `lib/config/map_config.dart` `userAgentPackageName`.
+  Android label set to `Wattson` in `AndroidManifest.xml`. Note: changing the
+  bundle id makes Android treat it as a new app — the old install must be
+  uninstalled (recorded rides are local and will be lost on uninstall).
+- **Custom launcher icon:** `launcher_icon.svg` (green rounded square, white "W"
+  + bicycle-wheel ellipses) rendered to all Android (`mipmap-*`, `playstore`
+  512px) and iOS (`AppIcon.appiconset`, 15 sizes) densities via `flutter_launcher_icons`.
 
 ## Phase 7 — Device config (Feature 6)
 
@@ -240,7 +266,8 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 | M4 | Recording (Drift DB, RecordingService, start/pause/stop, GPS) | **DONE** |
 | M5 | Foreground service + background recording | **DONE** |
 | M6 | Export (GPX + share_plus; CSV deferred) | **GPX DONE** |
-| M6b | Ride details Map tab (flutter_map, OpenCycleMap/OSM) | **DONE** |
+| M6b | Ride details Map tab (flutter_map, OpenCycleMap/OSM) | **Map DONE; Graphs STUBBED** |
+| M6c | Navigation + UX polish: pure Navigator (drop PageView), swipe gestures, full-screen mode, REC indicator, custom launcher icon, bundle id `org.gsoros.wattson` | **DONE (2026-07-20)** |
 | M7 | Device config (Wi-Fi, hostname, etc. via NUS) | |
 | M8 | Permissions, iOS pass, tests, polish |
 

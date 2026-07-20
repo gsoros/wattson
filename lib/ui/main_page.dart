@@ -22,6 +22,11 @@ class MainPage extends ConsumerWidget {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RideHistoryPage()));
   }
 
+  /// Opens the distraction-free full-screen metrics view.
+  void _openFullScreen(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _FullScreenPage()));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashState = ref.watch(dashConnectionStateProvider);
@@ -67,14 +72,19 @@ class MainPage extends ConsumerWidget {
         },
         child: Stack(
           children: [
-            // Main content
-            !connected
-                ? const Center(child: Text('No data — connect a device'))
-                : telemetry.when(
-                    data: (t) => _RideContent(t: t),
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(child: Text('Telemetry error: $e')),
-                  ),
+            // Main content — double tap toggles full-screen mode.
+            // Scoped to the content only (not the controls bar) so a double
+            // tap on the hold-to-confirm buttons doesn't trigger it.
+            GestureDetector(
+              onDoubleTap: () => _openFullScreen(context),
+              child: !connected
+                  ? const Center(child: Text('No data — connect a device'))
+                  : telemetry.when(
+                      data: (t) => _RideContent(t: t),
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Telemetry error: $e')),
+                    ),
+            ),
             // Recording controls always visible at the bottom.
             Align(
               alignment: Alignment.bottomCenter,
@@ -85,6 +95,41 @@ class MainPage extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Full-screen (distraction-free) metrics view
+// ---------------------------------------------------------------------------
+
+/// Shows the same metrics and trip stats as [MainPage] but without the
+/// [AppBar] or the recording controls bar. Exit via the system back gesture
+/// or a double tap.
+class _FullScreenPage extends ConsumerWidget {
+  const _FullScreenPage();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashState = ref.watch(dashConnectionStateProvider);
+    final hrmState = ref.watch(hrmConnectionStateProvider);
+    final telemetry = ref.watch(telemetryProvider);
+    final connected = dashState.value == BleConnectionState.connected || hrmState.value == BleConnectionState.connected;
+
+    return Scaffold(
+      body: GestureDetector(
+        // Double tap to exit full-screen mode.
+        onDoubleTap: () => Navigator.of(context).pop(),
+        child: SafeArea(
+          child: !connected
+              ? const Center(child: Text('No data — connect a device'))
+              : telemetry.when(
+                  data: (t) => _RideContent(t: t, bottomPadding: 0),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Telemetry error: $e')),
+                ),
         ),
       ),
     );
@@ -321,8 +366,13 @@ class _HoldToConfirmButtonState extends State<_HoldToConfirmButton> with SingleT
 
 /// The inner content so we can use non-const keys on the cards.
 class _RideContent extends ConsumerWidget {
-  const _RideContent({required this.t});
+  const _RideContent({required this.t, this.bottomPadding = 120});
   final Telemetry t;
+
+  /// Bottom padding for the list. Defaults to 120 to clear the recording
+  /// controls bar on the main page; set to 0 in full-screen mode where the
+  /// controls bar is absent.
+  final double bottomPadding;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -379,10 +429,7 @@ class _RideContent extends ConsumerWidget {
 
     return metrics.isEmpty || (!t.ordValid && !t.hrmValid)
         ? const Text('Waiting for data  ...')
-        : ListView(
-            padding: const EdgeInsets.fromLTRB(0, 8, 0, 120), // bottom padding for control bar
-            children: metrics,
-          );
+        : ListView(padding: EdgeInsets.fromLTRB(0, 8, 0, bottomPadding), children: metrics);
   }
 
   double _gridChildWidth(BuildContext context) {
@@ -412,6 +459,13 @@ class _TripStatsTile extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
+            // Recording indicator: a red dot with a "REC" label.
+            Column(
+              children: [
+                Icon(Icons.fiber_manual_record, color: Colors.red, size: 18),
+                Text('REC', style: theme.textTheme.labelSmall?.copyWith(color: Colors.red)),
+              ],
+            ),
             _Stat(theme: theme, label: 'Time', value: _fmt(elapsed)),
             _Stat(theme: theme, label: 'Distance', value: '${distanceKm.toStringAsFixed(1)} km'),
             _Stat(theme: theme, label: 'Climb', value: '${elevationGainM.toStringAsFixed(0)} m'),

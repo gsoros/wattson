@@ -61,5 +61,5 @@ class MapConfig {
   }
 
   /// Application package id, sent as the tile `User-Agent` per OSM policy.
-  static const String userAgentPackageName = 'app.wattson.wattson';
+  static const String userAgentPackageName = 'org.gsoros.wattson';
 }

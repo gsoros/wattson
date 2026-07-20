@@ -1,4 +1,4 @@
-package app.wattson.wattson
+package org.gsoros.wattson
 
 import io.flutter.embedding.android.FlutterActivity
 
