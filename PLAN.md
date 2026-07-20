@@ -196,6 +196,10 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
   (Thunderforest `cycle` style) when a free API key is set, otherwise an
   **OpenStreetMap** no-key fallback. Both require a valid `userAgentPackageName`
   (`app.wattson.wattson`). Attribution string switches accordingly.
+- The Thunderforest API key is entered on the **Settings** page
+  (`_ApiKeyCard`), persisted via `SharedPreferences` (`thunderforest_api_key`),
+  loaded at startup in `main` via `MapConfig.load()`, and saved (debounced)
+  via `MapConfig.setApiKey`.
 - Samples are loaded from Drift (`samples` where `ride_id` = ride id) in
   `initState` and passed to the tab; rides without GPS show a placeholder.
 

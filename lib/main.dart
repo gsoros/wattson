@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'config/map_config.dart';
 import 'providers/ble_provider.dart';
 import 'ui/ride_history_page.dart';
 import 'ui/main_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load the persisted Thunderforest API key for the Map tab before the UI
+  // renders, so the first map view uses the correct tile source.
+  MapConfig.load();
 
   // Initialize foreground service options (actual start/stop is driven by
   // RecordingService). Must happen before runApp.
