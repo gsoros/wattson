@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' show Value;
 import '../data/database.dart';
 import '../providers/recording_provider.dart';
 import '../util/ride_title_generator.dart';
+import '../export/export_service.dart';
 
 /// Formats a [DateTime] as e.g. "Jul 19, 2026" — used as the fallback ride
 /// title when the user hasn't set a custom name.
@@ -34,6 +35,7 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
   final _notesFocus = FocusNode();
   bool _saving = false;
   bool _deleting = false;
+  bool _exporting = false;
 
   @override
   void initState() {
@@ -84,6 +86,22 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _export() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final db = ref.read(databaseProvider);
+      final samples = await (db.select(db.samples)..where((s) => s.rideId.equals(_ride.id))).get();
+      await shareRideGpx(ride: _ride, samples: samples);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not export: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
@@ -144,8 +162,15 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
                     }
                   : null,
             ),
-            IconButton(icon: const Icon(Icons.save), tooltip: 'Save', onPressed: _save),
+            // Title and notes are saved on focus change
+            // TODO: also save after the user stops typing
+            // IconButton(icon: const Icon(Icons.save), tooltip: 'Save', onPressed: _save),
           ],
+          IconButton(
+            icon: _exporting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.share),
+            tooltip: 'Export GPX',
+            onPressed: _exporting ? null : _export,
+          ),
           IconButton(
             icon: _deleting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.delete),
             tooltip: 'Delete ride',
