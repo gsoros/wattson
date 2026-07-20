@@ -4,8 +4,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../config/map_config.dart';
 import '../data/database.dart';
-import 'map_settings_overlay.dart';
-import 'ride_overlay_graph.dart';
+import 'map_settings.dart';
+import 'ride_graph.dart';
 
 /// Map view for a single recorded ride.
 ///
@@ -15,17 +15,17 @@ import 'ride_overlay_graph.dart';
 /// "None"), a semi-transparent combined graph is drawn at the bottom; its
 /// cursor drives a dot on the map, and pinch/range zooming the graph zooms the
 /// map to the same distance window.
-class RideMapTab extends StatefulWidget {
-  const RideMapTab({super.key, required this.ride, required this.samples});
+class RideMap extends StatefulWidget {
+  const RideMap({super.key, required this.ride, required this.samples});
 
   final Ride ride;
   final List<Sample> samples;
 
   @override
-  State<RideMapTab> createState() => _RideMapTabState();
+  State<RideMap> createState() => _RideMapState();
 }
 
-class _RideMapTabState extends State<RideMapTab> {
+class _RideMapState extends State<RideMap> {
   final MapController _mapController = MapController();
 
   /// GPS-valid track points, aligned to [widget.samples].
@@ -49,7 +49,7 @@ class _RideMapTabState extends State<RideMapTab> {
   }
 
   @override
-  void didUpdateWidget(covariant RideMapTab oldWidget) {
+  void didUpdateWidget(covariant RideMap oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.samples != widget.samples) _computeTrack();
   }
@@ -166,18 +166,9 @@ class _RideMapTabState extends State<RideMapTab> {
 
     return Stack(
       children: [
+        // Map is always drawn first.
         map,
-        // Gear button (top-right) — toggles the Map Settings overlay.
-        Positioned(
-          top: 8,
-          right: 8,
-          child: Material(
-            color: theme.colorScheme.surface.withAlpha(204),
-            shape: const CircleBorder(),
-            elevation: 2,
-            child: IconButton(icon: const Icon(Icons.settings), tooltip: 'Map settings', onPressed: () => setState(() => _showSettings = !_showSettings)),
-          ),
-        ),
+
         // Bottom combined graph (two selectable metric slots). Only shown when
         // at least one slot is configured (not "None").
         if (MapConfig.graphMetric1 != GraphMetric.none || MapConfig.graphMetric2 != GraphMetric.none)
@@ -185,7 +176,7 @@ class _RideMapTabState extends State<RideMapTab> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: RideOverlayGraph(
+            child: RideGraph(
               samples: _gpsSamples,
               metric1: MapConfig.graphMetric1,
               metric2: MapConfig.graphMetric2,
@@ -196,16 +187,30 @@ class _RideMapTabState extends State<RideMapTab> {
               onResetView: _resetView,
             ),
           ),
-        // Map Settings overlay — drawn last so it sits above the graph.
-        if (_showSettings) MapSettingsOverlay(onChanged: () => setState(() {}), onClose: () => setState(() => _showSettings = false)),
+
+        // Map Settings overlay — drawn after the graph so it sits above the graph.
+        if (_showSettings) MapSettings(onChanged: () => setState(() {}), onClose: () => setState(() => _showSettings = false)),
+
         // Tile attribution (top-left, above the graph so it's never obscured).
         Positioned(
           top: 8,
           left: 8,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(color: theme.colorScheme.surface.withAlpha(204), borderRadius: BorderRadius.circular(6)),
+            decoration: BoxDecoration(color: theme.colorScheme.surface.withAlpha(120), borderRadius: BorderRadius.circular(6)),
             child: Text(MapConfig.attribution, style: theme.textTheme.labelSmall),
+          ),
+        ),
+
+        // Gear button (top-right) — toggles the Map Settings overlay. Drawn last to receive events first.
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Material(
+            color: theme.colorScheme.surface.withAlpha(120),
+            shape: const CircleBorder(),
+            elevation: 2,
+            child: IconButton(icon: const Icon(Icons.settings), tooltip: 'Map settings', onPressed: () => setState(() => _showSettings = !_showSettings)),
           ),
         ),
       ],

@@ -8,7 +8,7 @@ import '../data/database.dart';
 import '../providers/recording_provider.dart';
 import '../util/ride_title_generator.dart';
 import '../export/export_service.dart';
-import '../ui/ride_map_tab.dart';
+import 'ride_map.dart';
 
 /// Formats a [DateTime] as e.g. "Jul 19, 2026" — used as the fallback ride
 /// title when the user hasn't set a custom name.
@@ -267,7 +267,7 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
             height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - kToolbarHeight - 10,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: RideMapTab(ride: ride, samples: _samples),
+              child: RideMap(ride: ride, samples: _samples),
             ),
           ),
         ],

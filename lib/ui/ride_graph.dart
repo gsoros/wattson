@@ -23,8 +23,8 @@ import '../data/database.dart';
 ///    the start, the drag extends the end; on release the view zooms to that
 ///    range (a live highlight shows the selection while dragging).
 ///  * Double-tap   → resets the view to the full ride range.
-class RideOverlayGraph extends StatefulWidget {
-  const RideOverlayGraph({
+class RideGraph extends StatefulWidget {
+  const RideGraph({
     super.key,
     required this.samples,
     required this.metric1,
@@ -61,10 +61,10 @@ class RideOverlayGraph extends StatefulWidget {
   final VoidCallback onResetView;
 
   @override
-  State<RideOverlayGraph> createState() => _RideOverlayGraphState();
+  State<RideGraph> createState() => _RideGraphState();
 }
 
-class _RideOverlayGraphState extends State<RideOverlayGraph> {
+class _RideGraphState extends State<RideGraph> {
   // Precomputed per-sample series, aligned to [widget.samples].
   // Mutable (not `late final`) because [_computeSeries] may run again when the
   // widget is updated with new samples.
@@ -96,7 +96,7 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
   }
 
   @override
-  void didUpdateWidget(covariant RideOverlayGraph oldWidget) {
+  void didUpdateWidget(covariant RideGraph oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.samples != widget.samples || oldWidget.metric1 != widget.metric1 || oldWidget.metric2 != widget.metric2) {
       _computeSeries();
@@ -217,10 +217,10 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final height = math.min(180.0, constraints.maxHeight);
+        final height = math.min(150.0, constraints.maxHeight);
         final width = constraints.maxWidth;
-        const plotLeft = 44.0;
-        const plotRightPad = 44.0;
+        const plotLeft = 24.0;
+        const plotRightPad = 24.0;
         final plotRight = width - plotRightPad;
         const topPad = 16.0;
         const bottomPad = 22.0;
@@ -266,7 +266,7 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
           child: Container(
             height: height,
             decoration: BoxDecoration(
-              color: colorScheme.surface.withAlpha(204),
+              color: colorScheme.surface.withAlpha(180),
               border: Border(top: BorderSide(color: colorScheme.outline.withAlpha(120))),
             ),
             child: CustomPaint(
@@ -382,7 +382,7 @@ class _GraphPainter extends CustomPainter {
       canvas.drawLine(Offset(plotLeft, y), Offset(plotRight, y), gridPaint);
     }
 
-    // Axis titles + numeric ticks, colored per slot (skipped when a slot is
+    // Axis labels + numeric ticks, colored per slot (skipped when a slot is
     // "None", so it contributes no axis or series to the graph).
     final show1 = metric1 != GraphMetric.none;
     final show2 = metric2 != GraphMetric.none;
@@ -391,7 +391,7 @@ class _GraphPainter extends CustomPainter {
     final unit1 = metric1.unit.isNotEmpty ? ' (${metric1.unit})' : '';
     final unit2 = metric2.unit.isNotEmpty ? ' (${metric2.unit})' : '';
     if (show1) {
-      _drawText(canvas, '${metric1.label}$unit1', const Offset(2, 0), labelStyle1, y: plotTop - 2);
+      _drawText(canvas, '${metric1.label}$unit1', const Offset(22, 0), labelStyle1, y: plotTop - 2);
       final span1 = (max1 - min1).clamp(1e-6, double.infinity);
       for (var i = 0; i <= 4; i++) {
         final val1 = max1 - span1 * i / 4;
@@ -399,7 +399,7 @@ class _GraphPainter extends CustomPainter {
       }
     }
     if (show2) {
-      _drawText(canvas, '${metric2.label}$unit2', Offset(plotRight + 4, 0), labelStyle2, y: plotTop - 2, alignRight: true);
+      _drawText(canvas, '${metric2.label}$unit2', Offset(plotRight, 0), labelStyle2, y: plotTop - 2, alignRight: true);
       final span2 = (max2 - min2).clamp(1e-6, double.infinity);
       for (var i = 0; i <= 4; i++) {
         final val2 = max2 - span2 * i / 4;

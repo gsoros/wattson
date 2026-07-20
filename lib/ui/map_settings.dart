@@ -8,11 +8,11 @@ import '../config/map_config.dart';
 /// A semi-transparent Map Settings panel overlaid on the ride map.
 ///
 /// Lets the user configure the map source, the Thunderforest API key, the
-/// track stroke color/width, and the Elevation/Power overlay toggles. Every
+/// track stroke color/width, and the graphs overlays. Every
 /// change is persisted via [MapConfig] and reported through [onChanged] so the
 /// parent map can rebuild immediately.
-class MapSettingsOverlay extends StatefulWidget {
-  const MapSettingsOverlay({super.key, required this.onChanged, required this.onClose});
+class MapSettings extends StatefulWidget {
+  const MapSettings({super.key, required this.onChanged, required this.onClose});
 
   /// Called after any setting changes, so the parent can rebuild the map.
   final VoidCallback onChanged;
@@ -21,10 +21,10 @@ class MapSettingsOverlay extends StatefulWidget {
   final VoidCallback onClose;
 
   @override
-  State<MapSettingsOverlay> createState() => _MapSettingsOverlayState();
+  State<MapSettings> createState() => _MapSettingsState();
 }
 
-class _MapSettingsOverlayState extends State<MapSettingsOverlay> {
+class _MapSettingsState extends State<MapSettings> {
   final _apiKeyController = TextEditingController(text: MapConfig.thunderforestApiKey);
   Timer? _apiKeySaveTimer;
 
@@ -95,7 +95,7 @@ class _MapSettingsOverlayState extends State<MapSettingsOverlay> {
               margin: const EdgeInsets.all(24),
               constraints: const BoxConstraints(maxWidth: 420),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withAlpha(242),
+                color: theme.colorScheme.surface.withAlpha(160),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 12, offset: Offset(0, 4))],
               ),
