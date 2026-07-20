@@ -36,7 +36,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('BLE Devices'),
         actions: [
           IconButton(icon: const Icon(Icons.bug_report), tooltip: 'Share diagnostic log', onPressed: () => AppLog.share()),
           IconButton(
@@ -124,10 +124,10 @@ class _DeviceTile extends ConsumerWidget {
     Color iconColor;
     if (isCyclingComputer) {
       icon = Icons.pedal_bike;
-      iconColor = Colors.green;
+      iconColor = Colors.green.shade600;
     } else if (isHrm) {
       icon = Icons.favorite;
-      iconColor = Colors.red;
+      iconColor = Colors.red.shade600;
     } else {
       icon = Icons.devices_other;
       iconColor = Colors.grey;

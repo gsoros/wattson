@@ -10,11 +10,11 @@ import '../util/ride_title_generator.dart';
 import '../export/export_service.dart';
 import 'ride_map.dart';
 
-/// Formats a [DateTime] as e.g. "Jul 19, 2026" — used as the fallback ride
+/// Formats a [DateTime] as e.g. "Jul 19, 2026 12:34" — used as the fallback ride
 /// title when the user hasn't set a custom name.
 String formatRideDate(DateTime dt) {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+  return '${months[dt.month - 1]} ${dt.day}, ${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 }
 
 /// Detail view for a single recorded ride.
@@ -168,26 +168,6 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
       appBar: AppBar(
         title: Text(ride.title?.isNotEmpty == true ? ride.title! : formatRideDate(ride.startTime)),
         actions: [
-          if (_saving)
-            const Padding(
-              padding: EdgeInsets.all(14),
-              child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-            )
-          else ...[
-            IconButton(
-              icon: const Icon(Icons.auto_awesome),
-              tooltip: 'Suggest a title',
-              // Only suggest when the field is empty, so we never clobber input.
-              onPressed: _titleController.text.trim().isEmpty
-                  ? () {
-                      _titleController.text = generateRideTitle(_ride);
-                      _save();
-                    }
-                  : null,
-            ),
-            // Title and notes are saved after the user stops typing
-            // IconButton(icon: const Icon(Icons.save), tooltip: 'Save', onPressed: _save),
-          ],
           IconButton(
             icon: _exporting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.share),
             tooltip: 'Export GPX',
@@ -203,21 +183,44 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          TextField(
-            controller: _titleController,
-            focusNode: _titleFocus,
-            decoration: const InputDecoration(labelText: 'Title', hintText: 'Name this ride', border: OutlineInputBorder()),
-            textInputAction: TextInputAction.next,
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _titleController,
+                  focusNode: _titleFocus,
+                  decoration: const InputDecoration(labelText: 'Title', hintText: 'Name this ride', border: OutlineInputBorder()),
+                  textInputAction: TextInputAction.next,
+                ),
+              ),
+              if (_saving)
+                const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome),
+                  tooltip: 'Suggest a title',
+                  // Only suggest when the field is empty, so we never clobber input.
+                  onPressed: _titleController.text.trim().isEmpty
+                      ? () {
+                          _titleController.text = generateRideTitle(_ride);
+                          _save();
+                        }
+                      : null,
+                ),
+            ],
           ),
+
           const SizedBox(height: 16),
           Card(
+            margin: const EdgeInsets.all(0),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Summary', style: theme.textTheme.titleSmall),
-                  const SizedBox(height: 12),
                   _MetricRow(icon: Icons.calendar_today, label: 'Date', value: formatRideDate(ride.startTime)),
                   _MetricRow(icon: Icons.timer, label: 'Duration', value: duration != null ? _formatDuration(duration) : '—'),
                   _MetricRow(icon: Icons.straighten, label: 'Distance', value: '${ride.distanceKm.toStringAsFixed(1)} km'),
@@ -264,7 +267,7 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
           // visible scroll area (screen minus app bar and status bar) minus a
           // small gap, so it occupies most of the view when scrolled to bottom.
           SizedBox(
-            height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - kToolbarHeight - 10,
+            height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - kToolbarHeight - 20,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: RideMap(ride: ride, samples: _samples),
