@@ -28,48 +28,51 @@ final rideHistoryProvider = FutureProvider<List<Ride>>((ref) async {
 
 /// Page showing all recorded rides with summary info.
 class RideHistoryPage extends ConsumerWidget {
-  const RideHistoryPage({super.key, this.onNavigateBack});
-
-  /// Called to navigate back to the ride screen.
-  final VoidCallback? onNavigateBack;
+  const RideHistoryPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ridesAsync = ref.watch(rideHistoryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ride History'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), tooltip: 'Back to ride screen', onPressed: onNavigateBack),
-      ),
-      body: ridesAsync.when(
-        data: (rides) {
-          if (rides.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.directions_bike, size: 64, color: Theme.of(context).colorScheme.outlineVariant),
-                  const SizedBox(height: 16),
-                  Text('No rides yet', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Record a ride to see it here.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            );
+      appBar: AppBar(title: const Text('Ride History')),
+      body: GestureDetector(
+        // Swipe right anywhere on the history page to go back to Main.
+        // Positive primaryVelocity means the drag ended moving to the right.
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity != null && details.primaryVelocity! > 200) {
+            Navigator.of(context).pop();
           }
-          return ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: rides.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) => _RideCard(ride: rides[index]),
-          );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Could not load rides: $e')),
+        child: ridesAsync.when(
+          data: (rides) {
+            if (rides.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.directions_bike, size: 64, color: Theme.of(context).colorScheme.outlineVariant),
+                    const SizedBox(height: 16),
+                    Text('No rides yet', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Record a ride to see it here.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: rides.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (context, index) => _RideCard(ride: rides[index]),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Could not load rides: $e')),
+        ),
       ),
     );
   }

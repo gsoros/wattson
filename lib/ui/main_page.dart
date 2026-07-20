@@ -6,6 +6,7 @@ import '../models/recording_state.dart';
 import '../models/telemetry.dart';
 import '../providers/ble_provider.dart';
 import '../providers/recording_provider.dart';
+import 'ride_history_page.dart';
 import 'settings_page.dart';
 
 /// Live ride screen (Phase 4).
@@ -13,10 +14,13 @@ import 'settings_page.dart';
 /// Shows ORD Dash telemetry and HRM heart rate in a clean card layout, with
 /// recording controls at the bottom.
 class MainPage extends ConsumerWidget {
-  const MainPage({super.key, this.onShowHistory});
+  const MainPage({super.key});
 
-  /// Called when the user wants to navigate to the ride history page.
-  final VoidCallback? onShowHistory;
+  /// Pushes the Ride History page. Shared by the history button and the
+  /// swipe-right gesture so navigation stays in one place.
+  void _openHistory(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RideHistoryPage()));
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,7 +47,7 @@ class MainPage extends ConsumerWidget {
               }),
             ),
           ),
-          IconButton(icon: const Icon(Icons.history), tooltip: 'Ride History', onPressed: onShowHistory),
+          IconButton(icon: const Icon(Icons.history), tooltip: 'Ride History', onPressed: () => _openHistory(context)),
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: 'Settings',
@@ -53,26 +57,35 @@ class MainPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Main content
-          !connected
-              ? const Center(child: Text('No data — connect a device'))
-              : telemetry.when(
-                  data: (t) => _RideContent(t: t),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Telemetry error: $e')),
-                ),
-          // Recording controls always visible at the bottom.
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: recordingAsync.when(
-              data: (rs) => _RecordingControlBar(rs: rs, canRecord: connected),
-              loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
+      body: GestureDetector(
+        // Swipe left anywhere on the main page to open Ride History.
+        // Negative primaryVelocity means the drag ended moving to the left.
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity != null && details.primaryVelocity! < 200) {
+            _openHistory(context);
+          }
+        },
+        child: Stack(
+          children: [
+            // Main content
+            !connected
+                ? const Center(child: Text('No data — connect a device'))
+                : telemetry.when(
+                    data: (t) => _RideContent(t: t),
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(child: Text('Telemetry error: $e')),
+                  ),
+            // Recording controls always visible at the bottom.
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: recordingAsync.when(
+                data: (rs) => _RecordingControlBar(rs: rs, canRecord: connected),
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -364,10 +377,12 @@ class _RideContent extends ConsumerWidget {
       metrics.add(_TripStatsTile(elapsed: rs.elapsed, distanceKm: rs.distanceKm, elevationGainM: rs.elevationGainM));
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 120), // bottom padding for control bar
-      children: metrics,
-    );
+    return metrics.isEmpty || (!t.ordValid && !t.hrmValid)
+        ? const Text('Waiting for data  ...')
+        : ListView(
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 120), // bottom padding for control bar
+            children: metrics,
+          );
   }
 
   double _gridChildWidth(BuildContext context) {
