@@ -173,10 +173,31 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 ## Phase 6 — Export (Feature 5, GPX + CSV)
 
 - Generated on demand from DB rows (not during recording).
-- **GPX** with `<gpxtpx:TrackPointExtension>` carrying hr/cadence/power
-  (Strava-compatible).
-- **CSV** flat dump of `samples`.
+- **GPX** — DONE. `lib/export/gpx_serializer.dart` builds a GPX 1.1 doc with
+  `<gpxtpx:TrackPointExtension>` (Garmin v1 namespace) carrying `hr`, `cad`,
+  `distance` (cumulative, from speed×dt), `speed` (m/s), and `watts` = **human
+  power**. Motor power has no standard GPX field, so it is written as a custom
+  `<wattson:motorWatts>` element (ignored by Strava/Garmin, usable by the in-app
+  Graphs tab and configurable tools). `lib/export/export_service.dart` writes the
+  GPX to the temp dir and opens the OS sheet via `share_plus`. Verified: imports
+  cleanly into both **Strava** and **Intervals.icu**.
+- **CSV** flat dump of `samples` — DEFERRED to a later phase (not needed yet;
+  GPX covers the primary export path).
 - Manual `share_plus` OS sheet; no cloud/accounts.
+
+## Phase 6b — Ride details: Map tab DONE
+
+- `lib/ui/ride_details_page.dart` shows a 3-tab view: Details, **Map**, Graphs.
+- `lib/ui/ride_map_tab.dart` renders the recorded GPS track with `flutter_map`
+  (v8, OSM-based, vendor-free): a `PolylineLayer` over a `TileLayer`, with
+  zoom/pan via `InteractionOptions(flags: InteractiveFlag.all)` and a
+  `RichAttributionWidget` (bottom-right).
+- `lib/config/map_config.dart` centralizes tile sources: **OpenCycleMap**
+  (Thunderforest `cycle` style) when a free API key is set, otherwise an
+  **OpenStreetMap** no-key fallback. Both require a valid `userAgentPackageName`
+  (`app.wattson.wattson`). Attribution string switches accordingly.
+- Samples are loaded from Drift (`samples` where `ride_id` = ride id) in
+  `initState` and passed to the tab; rides without GPS show a placeholder.
 
 ## Phase 7 — Device config (Feature 6)
 
@@ -210,7 +231,8 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 | M3 | Live display (ride screen, 2-column layout, battery bar) | **DONE** |
 | M4 | Recording (Drift DB, RecordingService, start/pause/stop, GPS) | **DONE** |
 | M5 | Foreground service + background recording | **DONE** |
-| M6 | Export (GPX + CSV, share_plus) | |
+| M6 | Export (GPX + share_plus; CSV deferred) | **GPX DONE** |
+| M6b | Ride details Map tab (flutter_map, OpenCycleMap/OSM) | **DONE** |
 | M7 | Device config (Wi-Fi, hostname, etc. via NUS) | |
 | M8 | Permissions, iOS pass, tests, polish |
 

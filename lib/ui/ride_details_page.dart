@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' show Value;
@@ -6,6 +8,7 @@ import '../data/database.dart';
 import '../providers/recording_provider.dart';
 import '../util/ride_title_generator.dart';
 import '../export/export_service.dart';
+import '../ui/ride_map_tab.dart';
 
 /// Formats a [DateTime] as e.g. "Jul 19, 2026" — used as the fallback ride
 /// title when the user hasn't set a custom name.
@@ -36,6 +39,9 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
   bool _saving = false;
   bool _deleting = false;
   bool _exporting = false;
+  AppDatabase? _db;
+  Timer? _saveTimer;
+  List<Sample> _samples = const [];
 
   @override
   void initState() {
@@ -43,17 +49,31 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
     _ride = widget.ride;
     _titleController = TextEditingController(text: _ride.title ?? '');
     _notesController = TextEditingController(text: _ride.notes ?? '');
-    // Auto-save on blur for both fields.
-    _titleFocus.addListener(() {
-      if (!_titleFocus.hasFocus) _save();
-    });
-    _notesFocus.addListener(() {
-      if (!_notesFocus.hasFocus) _save();
-    });
+    // Auto-save a few seconds after the user stops typing in either field.
+    _titleController.addListener(_onFieldChanged);
+    _notesController.addListener(_onFieldChanged);
+    // Load the GPS track for the Map tab.
+    _loadSamples();
+  }
+
+  Future<void> _loadSamples() async {
+    _db ??= ref.read(databaseProvider);
+    final db = _db!;
+    final samples = await (db.select(db.samples)..where((s) => s.rideId.equals(_ride.id))).get();
+    if (mounted) setState(() => _samples = samples);
+  }
+
+  /// (Re)starts the debounce timer that triggers a save once typing pauses.
+  void _onFieldChanged() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(seconds: 2), _save);
   }
 
   @override
   void dispose() {
+    _saveTimer?.cancel();
+    _titleController.removeListener(_onFieldChanged);
+    _notesController.removeListener(_onFieldChanged);
     _titleController.dispose();
     _notesController.dispose();
     _titleFocus.dispose();
@@ -65,6 +85,7 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
   /// back to the date label.
   Future<void> _save() async {
     if (_saving) return;
+    _saveTimer?.cancel();
     final title = _titleController.text.trim();
     final notes = _notesController.text;
     // No-op if unchanged relative to the locally tracked ride. Comparing against
@@ -74,7 +95,8 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
 
     setState(() => _saving = true);
     try {
-      final db = ref.read(databaseProvider);
+      _db ??= ref.read(databaseProvider);
+      final db = _db!;
       await db.update(db.rides).replace(_ride.copyWith(title: Value(title.isEmpty ? null : title), notes: Value(notes.isEmpty ? null : notes)));
       // Reflect the saved values locally so subsequent blur checks are correct.
       _ride = _ride.copyWith(title: Value(title.isEmpty ? null : title), notes: Value(notes.isEmpty ? null : notes));
@@ -162,8 +184,7 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
                     }
                   : null,
             ),
-            // Title and notes are saved on focus change
-            // TODO: also save after the user stops typing
+            // Title and notes are saved after the user stops typing
             // IconButton(icon: const Icon(Icons.save), tooltip: 'Save', onPressed: _save),
           ],
           IconButton(
@@ -200,7 +221,7 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
                     titleFocus: _titleFocus,
                     notesFocus: _notesFocus,
                   ),
-                  const Center(child: Text('Map coming soon')),
+                  RideMapTab(ride: ride, samples: _samples),
                   const Center(child: Text('Graphs coming soon')),
                 ],
               ),

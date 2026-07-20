@@ -54,6 +54,9 @@ dependencies:
   shared_preferences: ^2.5.0
   # OS share sheet (export)
   share_plus: ^13.2.1
+  # Map rendering (OSM-based, vendor-free)
+  flutter_map: ^8.3.1
+  latlong2: ^0.10.0
 
 dev_dependencies:
   flutter_test:
