@@ -50,7 +50,7 @@ String buildGpx({required Ride ride, required List<Sample> samples}) {
     buffer.writeln('        <time>${_iso(s.ts)}</time>');
     buffer.writeln('        <extensions>');
     buffer.writeln('          <gpxtpx:TrackPointExtension>');
-    buffer.writeln('            <gpxtpx:hr>${s.hrBpm}</gpxtpx:hr>');
+    if (s.hrBpm != 0) buffer.writeln('            <gpxtpx:hr>${s.hrBpm}</gpxtpx:hr>');
     buffer.writeln('            <gpxtpx:cad>${s.cadenceRpm}</gpxtpx:cad>');
     buffer.writeln('            <gpxtpx:distance>${_num(distanceKm * 1000)}</gpxtpx:distance>');
     buffer.writeln('            <gpxtpx:speed>${_num(s.speedKmh / 3.6)}</gpxtpx:speed>');

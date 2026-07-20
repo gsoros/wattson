@@ -202,6 +202,10 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
   via `MapConfig.setApiKey`.
 - Samples are loaded from Drift (`samples` where `ride_id` = ride id) in
   `initState` and passed to the tab; rides without GPS show a placeholder.
+- **Zero-area bounds guard:** if all valid fixes share one coordinate, the map
+  centers on that point at a fixed zoom (instead of `CameraFit.bounds`, which
+  would compute a non-finite zoom and crash). `CameraFit.bounds` also gets a
+  `maxZoom` cap as a safety net.
 
 ## Phase 7 — Device config (Feature 6)
 
