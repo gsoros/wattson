@@ -1,11 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ble/ble_service.dart';
 import '../ble/ble_scan_result.dart';
-import '../config/map_config.dart';
 import '../providers/ble_provider.dart';
 import '../util/app_log.dart';
 
@@ -19,29 +16,18 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   BleService? _service;
-  final _apiKeyController = TextEditingController();
-  Timer? _apiKeySaveTimer;
 
   @override
   void initState() {
     super.initState();
     _service = ref.read(bleServiceProvider);
     _service!.startScan();
-    _apiKeyController.text = MapConfig.thunderforestApiKey;
   }
 
   @override
   void dispose() {
-    _apiKeySaveTimer?.cancel();
-    _apiKeyController.dispose();
     _service?.stopScan();
     super.dispose();
-  }
-
-  /// Persists the Thunderforest API key a moment after the user stops typing.
-  void _onApiKeyChanged(String value) {
-    _apiKeySaveTimer?.cancel();
-    _apiKeySaveTimer = Timer(const Duration(seconds: 1), () => MapConfig.setApiKey(value));
   }
 
   @override
@@ -66,8 +52,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ),
       body: Column(
         children: [
-          // Thunderforest (OpenCycleMap) API key for the ride Map tab.
-          _ApiKeyCard(controller: _apiKeyController, onChanged: _onApiKeyChanged),
           Expanded(
             child: scanResults.when(
               data: (devices) {
@@ -213,49 +197,5 @@ class _DeviceTile extends ConsumerWidget {
     }
 
     return tile;
-  }
-}
-
-/// Card with the Thunderforest API key field for the ride Map tab.
-class _ApiKeyCard extends StatelessWidget {
-  const _ApiKeyCard({required this.controller, required this.onChanged});
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Map tiles (OpenCycleMap)', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              'Enter a free Thunderforest API key to use the cycling-optimized '
-              'OpenCycleMap tiles. Leave blank to use plain OpenStreetMap.',
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              onChanged: onChanged,
-              decoration: const InputDecoration(
-                labelText: 'Thunderforest API key',
-                hintText: 'Paste your key here',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.map),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text('Get a free key at https://www.thunderforest.com/pricing/', style: theme.textTheme.bodySmall),
-          ],
-        ),
-      ),
-    );
   }
 }

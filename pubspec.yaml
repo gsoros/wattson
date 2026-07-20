@@ -57,6 +57,8 @@ dependencies:
   # Map rendering (OSM-based, vendor-free)
   flutter_map: ^8.3.1
   latlong2: ^0.10.0
+  # Color picker dialog for map track stroke color
+  flex_color_picker: ^3.6.0
   # Structured logging (per-module levels, caller file/line via PrettyPrinter)
   logger: ^2.5.0
 

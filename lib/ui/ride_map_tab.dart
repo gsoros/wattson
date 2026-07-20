@@ -4,30 +4,113 @@ import 'package:latlong2/latlong.dart';
 
 import '../config/map_config.dart';
 import '../data/database.dart';
+import 'map_settings_overlay.dart';
+import 'ride_overlay_graph.dart';
 
 /// Map view for a single recorded ride.
 ///
-/// Renders the recorded GPS track as a polyline over an OpenStreetMap-based
-/// tile layer (OpenCycleMap when a Thunderforest key is configured, otherwise
-/// plain OSM). The user can freely zoom and pan; the view initially frames the
-/// whole route. Rides with no GPS fixes show a placeholder. If every fix shares
-/// a single location (zero-area bounds), the map centers on that point at a
-/// fixed zoom instead of fitting bounds, which would otherwise compute a
-/// non-finite zoom and crash.
-class RideMapTab extends StatelessWidget {
+/// Renders the recorded GPS track as a polyline over a tile layer (selected in
+/// Map Settings). A gear button (top-right) opens a semi-transparent Map
+/// Settings overlay. When at least one overlay toggle is enabled, a
+/// semi-transparent combined Elevation/Power graph is drawn at the bottom; its
+/// cursor drives a dot on the map, and pinch/range zooming the graph zooms the
+/// map to the same distance window.
+class RideMapTab extends StatefulWidget {
   const RideMapTab({super.key, required this.ride, required this.samples});
 
   final Ride ride;
   final List<Sample> samples;
 
-  List<LatLng> get _points => samples.where((s) => s.lat != null && s.lon != null).map((s) => LatLng(s.lat!, s.lon!)).toList();
+  @override
+  State<RideMapTab> createState() => _RideMapTabState();
+}
+
+class _RideMapTabState extends State<RideMapTab> {
+  final MapController _mapController = MapController();
+
+  /// GPS-valid track points, aligned to [widget.samples].
+  late final List<LatLng> _points;
+  late final List<Sample> _gpsSamples;
+
+  /// Cumulative distance (km) per GPS-valid sample, aligned to [_points].
+  late final List<double> _distances;
+
+  bool _showSettings = false;
+
+  /// Distance (km) of the cursor, or null when not placed.
+  double? _cursorDist;
+
+  @override
+  void initState() {
+    super.initState();
+    _computeTrack();
+  }
+
+  @override
+  void didUpdateWidget(covariant RideMapTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.samples != widget.samples) _computeTrack();
+  }
+
+  void _computeTrack() {
+    _gpsSamples = widget.samples.where((s) => s.lat != null && s.lon != null).toList();
+    _points = _gpsSamples.map((s) => LatLng(s.lat!, s.lon!)).toList();
+    _distances = [];
+    double distanceKm = 0;
+    DateTime? prevTs;
+    for (final s in _gpsSamples) {
+      if (prevTs != null) {
+        final dtH = s.ts.difference(prevTs).inMilliseconds / 3600000.0;
+        if (dtH > 0) distanceKm += s.speedKmh * dtH;
+      }
+      prevTs = s.ts;
+      _distances.add(distanceKm);
+    }
+  }
+
+  /// Index of the GPS sample whose distance is closest to [km].
+  int _nearestIndex(double km) {
+    if (_distances.isEmpty) return 0;
+    var lo = 0;
+    var hi = _distances.length - 1;
+    while (lo < hi) {
+      final mid = (lo + hi) ~/ 2;
+      if (_distances[mid] < km) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    if (lo > 0 && (lo == _distances.length || (_distances[lo] - km) > (km - _distances[lo - 1]))) {
+      lo -= 1;
+    }
+    return lo;
+  }
+
+  /// Fits the map camera to the GPS samples within [startKm, endKm].
+  void _fitToRange(double startKm, double endKm) {
+    final inRange = <LatLng>[];
+    for (var i = 0; i < _distances.length; i++) {
+      if (_distances[i] >= startKm && _distances[i] <= endKm) inRange.add(_points[i]);
+    }
+    if (inRange.isEmpty) return;
+    _mapController.fitCamera(CameraFit.bounds(bounds: LatLngBounds.fromPoints(inRange), padding: const EdgeInsets.all(48), maxZoom: 18));
+  }
+
+  /// Fits the map camera to the whole route.
+  void _resetView() {
+    if (_points.isEmpty) return;
+    _mapController.fitCamera(CameraFit.bounds(bounds: LatLngBounds.fromPoints(_points), padding: const EdgeInsets.all(48), maxZoom: 18));
+  }
+
+  LatLngBounds _initialBounds() => LatLngBounds.fromPoints(_points);
 
   @override
   Widget build(BuildContext context) {
-    final points = _points;
     final theme = Theme.of(context);
+    final primary = Color(MapConfig.strokeColor ?? MapConfig.defaultStrokeColor);
 
-    if (points.isEmpty) {
+    if (_points.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
@@ -36,37 +119,92 @@ class RideMapTab extends StatelessWidget {
       );
     }
 
-    final primary = theme.colorScheme.primary;
+    final showGraph = MapConfig.elevationOverlay || MapConfig.powerOverlay;
 
-    // Distinct coordinates. If every fix shares one location the bounds have
-    // zero area, which makes CameraFit compute a non-finite zoom and crash. In
-    // that case we center on that single point at a fixed zoom instead.
-    final unique = points.toSet();
-    final MapOptions options;
-    if (unique.length <= 1) {
-      options = MapOptions(
-        initialCenter: points.first,
-        initialZoom: 16,
-        interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
-      );
-    } else {
-      options = MapOptions(
-        // Free zoom/pan interaction; initial view frames the whole route.
-        // maxZoom caps the fit so a near-zero-area bounds can't produce an
-        // infinite zoom.
-        initialCameraFit: CameraFit.bounds(bounds: LatLngBounds.fromPoints(points), padding: const EdgeInsets.all(48), maxZoom: 18),
-        interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+    // Cursor dot marker (only when a cursor distance is set and within range).
+    final markers = <Marker>[];
+    if (_cursorDist != null) {
+      final idx = _nearestIndex(_cursorDist!);
+      markers.add(
+        Marker(
+          point: _points[idx],
+          width: 16,
+          height: 16,
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.error,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+          ),
+        ),
       );
     }
 
-    return FlutterMap(
-      options: options,
+    final mapOptions = _points.toSet().length <= 1
+        ? MapOptions(
+            initialCenter: _points.first,
+            initialZoom: 16,
+            interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+          )
+        : MapOptions(
+            initialCameraFit: CameraFit.bounds(bounds: _initialBounds(), padding: const EdgeInsets.all(48), maxZoom: 18),
+            interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+          );
+
+    final map = FlutterMap(
+      mapController: _mapController,
+      options: mapOptions,
       children: [
         TileLayer(urlTemplate: MapConfig.tileTemplate, userAgentPackageName: MapConfig.userAgentPackageName),
         PolylineLayer(
-          polylines: [Polyline(points: points, strokeWidth: 4, color: primary, borderStrokeWidth: 1, borderColor: primary.withAlpha(80))],
+          polylines: [Polyline(points: _points, strokeWidth: MapConfig.strokeWidth, color: primary, borderStrokeWidth: 1, borderColor: primary.withAlpha(80))],
         ),
-        RichAttributionWidget(alignment: AttributionAlignment.bottomRight, attributions: [TextSourceAttribution(MapConfig.attribution)]),
+        if (markers.isNotEmpty) MarkerLayer(markers: markers),
+      ],
+    );
+
+    return Stack(
+      children: [
+        map,
+        // Gear button (top-right) — toggles the Map Settings overlay.
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Material(
+            color: theme.colorScheme.surface.withAlpha(204),
+            shape: const CircleBorder(),
+            elevation: 2,
+            child: IconButton(icon: const Icon(Icons.settings), tooltip: 'Map settings', onPressed: () => setState(() => _showSettings = !_showSettings)),
+          ),
+        ),
+        // Bottom combined graph.
+        if (showGraph)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: RideOverlayGraph(
+              samples: _gpsSamples,
+              showElevation: MapConfig.elevationOverlay,
+              showPower: MapConfig.powerOverlay,
+              onCursorChanged: (km) => setState(() => _cursorDist = km),
+              onViewRangeChanged: _fitToRange,
+              onResetView: _resetView,
+            ),
+          ),
+        // Map Settings overlay — drawn last so it sits above the graph.
+        if (_showSettings) MapSettingsOverlay(onChanged: () => setState(() {}), onClose: () => setState(() => _showSettings = false)),
+        // Tile attribution (top-left, above the graph so it's never obscured).
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(color: theme.colorScheme.surface.withAlpha(204), borderRadius: BorderRadius.circular(6)),
+            child: Text(MapConfig.attribution, style: theme.textTheme.labelSmall),
+          ),
+        ),
       ],
     );
   }
