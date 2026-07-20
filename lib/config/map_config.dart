@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/database.dart';
+
 /// Tile sources for the ride Map tab.
 ///
 /// The base source is OpenStreetMap (no key required). When a Thunderforest
@@ -49,11 +51,67 @@ enum MapSource {
   String attribution(String apiKey) => needsKey && apiKey.trim().isNotEmpty ? _attribution : '© OpenStreetMap contributors';
 }
 
+/// A ride metric that can be plotted on the bottom overlay graph.
+///
+/// Each metric knows its display [label] and [unit], and reads its value from a
+/// [Sample] via [value] (returning [double.nan] when unavailable, e.g. missing
+/// GPS elevation). The two graph slots each hold a [GraphMetric].
+enum GraphMetric {
+  elevation('Elevation', 'm'),
+  speed('Speed', 'km/h'),
+  humanPower('Human Power', 'W'),
+  motorPower('Motor Power', 'W'),
+  cadence('Cadence', 'rpm'),
+  pasLevel('PAS Level', ''),
+  heartRate('Heart Rate', 'bpm'),
+  batteryVoltage('Battery Voltage', 'V'),
+  batteryCurrent('Battery Current', 'A'),
+  soc('State of Charge', '%'),
+  range('Range', 'km');
+
+  const GraphMetric(this.label, this.unit);
+
+  /// Human-readable label for the metric selector.
+  final String label;
+
+  /// Unit suffix, or empty if dimensionless.
+  final String unit;
+
+  /// Reads this metric's value from [s], or [double.nan] if unavailable.
+  double value(Sample s) {
+    switch (this) {
+      case GraphMetric.elevation:
+        return s.elevation ?? double.nan;
+      case GraphMetric.speed:
+        return s.speedKmh;
+      case GraphMetric.humanPower:
+        return s.humanPowerW;
+      case GraphMetric.motorPower:
+        return s.motorPowerW;
+      case GraphMetric.cadence:
+        return s.cadenceRpm.toDouble();
+      case GraphMetric.pasLevel:
+        return s.pasLevel.toDouble();
+      case GraphMetric.heartRate:
+        return s.hrBpm.toDouble();
+      case GraphMetric.batteryVoltage:
+        return s.batteryV;
+      case GraphMetric.batteryCurrent:
+        return s.batteryA;
+      case GraphMetric.soc:
+        return s.soc.toDouble();
+      case GraphMetric.range:
+        return s.rangeKm;
+    }
+  }
+}
+
 /// Persistent map configuration for the ride Map tab.
 ///
 /// Holds the Thunderforest API key, the selected [MapSource], the track stroke
-/// color/width, and the Elevation/Power overlay toggles. All values are stored
-/// in [SharedPreferences] and loaded once at startup by [MapConfig.load].
+/// color/width, and the two [GraphMetric] slots for the bottom overlay graph.
+/// All values are stored in [SharedPreferences] and loaded once at startup by
+/// [MapConfig.load].
 class MapConfig {
   MapConfig._();
 
@@ -61,8 +119,8 @@ class MapConfig {
   static const String _prefsKeySource = 'map_source';
   static const String _prefsKeyStrokeColor = 'map_stroke_color';
   static const String _prefsKeyStrokeWidth = 'map_stroke_width';
-  static const String _prefsKeyElevationOverlay = 'map_elevation_overlay';
-  static const String _prefsKeyPowerOverlay = 'map_power_overlay';
+  static const String _prefsKeyGraphMetric1 = 'graph_metric_1';
+  static const String _prefsKeyGraphMetric2 = 'graph_metric_2';
 
   /// The Thunderforest API key, loaded at runtime. Empty means "no key".
   static String thunderforestApiKey = '';
@@ -80,11 +138,11 @@ class MapConfig {
   /// Track stroke width in logical pixels.
   static double strokeWidth = 4.0;
 
-  /// Whether the Elevation series is shown in the bottom overlay graph.
-  static bool elevationOverlay = true;
+  /// The metric plotted in the first (left, filled) graph slot.
+  static GraphMetric graphMetric1 = GraphMetric.elevation;
 
-  /// Whether the Power series is shown in the bottom overlay graph.
-  static bool powerOverlay = true;
+  /// The metric plotted in the second (right, line) graph slot.
+  static GraphMetric graphMetric2 = GraphMetric.humanPower;
 
   /// Loads all persisted values. Call once at startup (e.g. in [main]).
   static Future<void> load() async {
@@ -94,8 +152,8 @@ class MapConfig {
     mapSource = MapSource.values.where((s) => s.name == sourceName).firstOrNull ?? MapSource.osm;
     strokeColor = prefs.getInt(_prefsKeyStrokeColor) ?? defaultStrokeColor;
     strokeWidth = prefs.getDouble(_prefsKeyStrokeWidth) ?? 4.0;
-    elevationOverlay = prefs.getBool(_prefsKeyElevationOverlay) ?? true;
-    powerOverlay = prefs.getBool(_prefsKeyPowerOverlay) ?? true;
+    graphMetric1 = GraphMetric.values.where((m) => m.name == prefs.getString(_prefsKeyGraphMetric1)).firstOrNull ?? GraphMetric.elevation;
+    graphMetric2 = GraphMetric.values.where((m) => m.name == prefs.getString(_prefsKeyGraphMetric2)).firstOrNull ?? GraphMetric.humanPower;
   }
 
   /// Persists [key] and updates the in-memory value.
@@ -135,18 +193,18 @@ class MapConfig {
     await prefs.setDouble(_prefsKeyStrokeWidth, width);
   }
 
-  /// Persists the Elevation overlay toggle.
-  static Future<void> setElevationOverlay(bool enabled) async {
-    elevationOverlay = enabled;
+  /// Persists the first graph slot's [GraphMetric].
+  static Future<void> setGraphMetric1(GraphMetric metric) async {
+    graphMetric1 = metric;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_prefsKeyElevationOverlay, enabled);
+    await prefs.setString(_prefsKeyGraphMetric1, metric.name);
   }
 
-  /// Persists the Power overlay toggle.
-  static Future<void> setPowerOverlay(bool enabled) async {
-    powerOverlay = enabled;
+  /// Persists the second graph slot's [GraphMetric].
+  static Future<void> setGraphMetric2(GraphMetric metric) async {
+    graphMetric2 = metric;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_prefsKeyPowerOverlay, enabled);
+    await prefs.setString(_prefsKeyGraphMetric2, metric.name);
   }
 
   /// The tile template actually used at runtime for the active source.

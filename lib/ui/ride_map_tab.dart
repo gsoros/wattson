@@ -119,8 +119,6 @@ class _RideMapTabState extends State<RideMapTab> {
       );
     }
 
-    final showGraph = MapConfig.elevationOverlay || MapConfig.powerOverlay;
-
     // Cursor dot marker (only when a cursor distance is set and within range).
     final markers = <Marker>[];
     if (_cursorDist != null) {
@@ -178,21 +176,22 @@ class _RideMapTabState extends State<RideMapTab> {
             child: IconButton(icon: const Icon(Icons.settings), tooltip: 'Map settings', onPressed: () => setState(() => _showSettings = !_showSettings)),
           ),
         ),
-        // Bottom combined graph.
-        if (showGraph)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: RideOverlayGraph(
-              samples: _gpsSamples,
-              showElevation: MapConfig.elevationOverlay,
-              showPower: MapConfig.powerOverlay,
-              onCursorChanged: (km) => setState(() => _cursorDist = km),
-              onViewRangeChanged: _fitToRange,
-              onResetView: _resetView,
-            ),
+        // Bottom combined graph (two selectable metric slots).
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: RideOverlayGraph(
+            samples: _gpsSamples,
+            metric1: MapConfig.graphMetric1,
+            metric2: MapConfig.graphMetric2,
+            color1: theme.colorScheme.primary,
+            color2: theme.colorScheme.tertiary,
+            onCursorChanged: (km) => setState(() => _cursorDist = km),
+            onViewRangeChanged: _fitToRange,
+            onResetView: _resetView,
           ),
+        ),
         // Map Settings overlay — drawn last so it sits above the graph.
         if (_showSettings) MapSettingsOverlay(onChanged: () => setState(() {}), onClose: () => setState(() => _showSettings = false)),
         // Tile attribution (top-left, above the graph so it's never obscured).

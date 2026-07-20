@@ -181,21 +181,38 @@ class _MapSettingsOverlayState extends State<MapSettingsOverlay> {
                     ),
                     const SizedBox(height: 8),
 
-                    // Overlay toggles.
-                    SwitchListTile(
-                      title: const Text('Elevation overlay'),
-                      value: MapConfig.elevationOverlay,
-                      onChanged: (v) async {
-                        await MapConfig.setElevationOverlay(v);
+                    // Graph metric slot 1 (left axis, filled).
+                    Text('Graph metric 1', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 4),
+                    DropdownButton<GraphMetric>(
+                      value: MapConfig.graphMetric1,
+                      isExpanded: true,
+                      items: [
+                        for (final m in GraphMetric.values)
+                          if (m != MapConfig.graphMetric2) DropdownMenuItem(value: m, child: Text(m.label)),
+                      ],
+                      onChanged: (m) async {
+                        if (m == null) return;
+                        await MapConfig.setGraphMetric1(m);
                         widget.onChanged();
                         setState(() {});
                       },
                     ),
-                    SwitchListTile(
-                      title: const Text('Power overlay'),
-                      value: MapConfig.powerOverlay,
-                      onChanged: (v) async {
-                        await MapConfig.setPowerOverlay(v);
+                    const SizedBox(height: 12),
+
+                    // Graph metric slot 2 (right axis, line).
+                    Text('Graph metric 2', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 4),
+                    DropdownButton<GraphMetric>(
+                      value: MapConfig.graphMetric2,
+                      isExpanded: true,
+                      items: [
+                        for (final m in GraphMetric.values)
+                          if (m != MapConfig.graphMetric1) DropdownMenuItem(value: m, child: Text(m.label)),
+                      ],
+                      onChanged: (m) async {
+                        if (m == null) return;
+                        await MapConfig.setGraphMetric2(m);
                         widget.onChanged();
                         setState(() {});
                       },

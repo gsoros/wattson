@@ -3,14 +3,16 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../config/map_config.dart';
 import '../data/database.dart';
 
-/// A semi-transparent combined Elevation / Human-Power overlay graph drawn at
-/// the bottom of the ride map.
+/// A semi-transparent combined overlay graph drawn at the bottom of the ride
+/// map, plotting any two [GraphMetric]s in two slots.
 ///
 /// The horizontal axis is cumulative distance (km), integrated from speed × Δt
-/// (the same formula used by the GPX exporter). The vertical axis shows
-/// elevation (m, left) and human power (W, right) as two overlaid line series.
+/// (the same formula used by the GPX exporter). The vertical axis shows the two
+/// selected metrics as two overlaid series: slot 1 (left axis, filled) and
+/// slot 2 (right axis, line).
 ///
 /// Interaction:
 ///  * Tap / drag  → moves the cursor to the nearest sample; the parent moves a
@@ -24,8 +26,10 @@ class RideOverlayGraph extends StatefulWidget {
   const RideOverlayGraph({
     super.key,
     required this.samples,
-    required this.showElevation,
-    required this.showPower,
+    required this.metric1,
+    required this.metric2,
+    required this.color1,
+    required this.color2,
     required this.onCursorChanged,
     required this.onViewRangeChanged,
     required this.onResetView,
@@ -34,11 +38,17 @@ class RideOverlayGraph extends StatefulWidget {
   /// GPS-valid ride samples (lat/lon non-null), in time order.
   final List<Sample> samples;
 
-  /// Whether the Elevation series is drawn.
-  final bool showElevation;
+  /// Metric plotted in the first (left, filled) slot.
+  final GraphMetric metric1;
 
-  /// Whether the Power series is drawn.
-  final bool showPower;
+  /// Metric plotted in the second (right, line) slot.
+  final GraphMetric metric2;
+
+  /// Color for the first slot's series/fill.
+  final Color color1;
+
+  /// Color for the second slot's series.
+  final Color color2;
 
   /// Called with the distance (km) of the sample under the cursor.
   final ValueChanged<double> onCursorChanged;
@@ -58,13 +68,13 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
   // Mutable (not `late final`) because [_computeSeries] may run again when the
   // widget is updated with new samples.
   List<double> _distances = const []; // cumulative km
-  List<double> _elevations = const []; // m (may contain nulls -> NaN)
-  List<double> _powers = const []; // W
+  List<double> _series1 = const []; // metric1 values (NaN where unavailable)
+  List<double> _series2 = const []; // metric2 values
   double _totalDistance = 0;
-  double _elevMin = 0;
-  double _elevMax = 1;
-  double _powerMin = 0;
-  double _powerMax = 1;
+  double _min1 = 0;
+  double _max1 = 1;
+  double _min2 = 0;
+  double _max2 = 1;
 
   // Visible distance window (km).
   double _viewStart = 0;
@@ -85,7 +95,7 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
   @override
   void didUpdateWidget(covariant RideOverlayGraph oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.samples != widget.samples || oldWidget.showElevation != widget.showElevation || oldWidget.showPower != widget.showPower) {
+    if (oldWidget.samples != widget.samples || oldWidget.metric1 != widget.metric1 || oldWidget.metric2 != widget.metric2) {
       _computeSeries();
     }
   }
@@ -93,14 +103,14 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
   void _computeSeries() {
     final samples = widget.samples;
     _distances = [];
-    _elevations = [];
-    _powers = [];
+    _series1 = [];
+    _series2 = [];
     double distanceKm = 0;
     DateTime? prevTs;
-    double? elevMin;
-    double? elevMax;
-    double? powerMin;
-    double? powerMax;
+    double? min1;
+    double? max1;
+    double? min2;
+    double? max2;
     for (final s in samples) {
       if (prevTs != null) {
         final dtH = s.ts.difference(prevTs).inMilliseconds / 3600000.0;
@@ -108,23 +118,26 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
       }
       prevTs = s.ts;
       _distances.add(distanceKm);
-      final e = s.elevation;
-      _elevations.add(e ?? double.nan);
-      _powers.add(s.humanPowerW);
-      if (e != null) {
-        elevMin = elevMin == null ? e : math.min(elevMin, e);
-        elevMax = elevMax == null ? e : math.max(elevMax, e);
+      final v1 = widget.metric1.value(s);
+      final v2 = widget.metric2.value(s);
+      _series1.add(v1);
+      _series2.add(v2);
+      if (!v1.isNaN) {
+        min1 = min1 == null ? v1 : math.min(min1, v1);
+        max1 = max1 == null ? v1 : math.max(max1, v1);
       }
-      powerMin = powerMin == null ? s.humanPowerW : math.min(powerMin, s.humanPowerW);
-      powerMax = powerMax == null ? s.humanPowerW : math.max(powerMax, s.humanPowerW);
+      if (!v2.isNaN) {
+        min2 = min2 == null ? v2 : math.min(min2, v2);
+        max2 = max2 == null ? v2 : math.max(max2, v2);
+      }
     }
     _totalDistance = distanceKm;
     _viewStart = 0;
     _viewEnd = distanceKm;
-    _elevMin = elevMin ?? 0;
-    _elevMax = elevMax ?? 1;
-    _powerMin = powerMin ?? 0;
-    _powerMax = powerMax ?? 1;
+    _min1 = min1 ?? 0;
+    _max1 = max1 ?? 1;
+    _min2 = min2 ?? 0;
+    _max2 = max2 ?? 1;
     _cursorDist = null;
     _rangeStart = null;
   }
@@ -197,8 +210,6 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final elevColor = colorScheme.primary;
-    final powerColor = colorScheme.tertiary;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -207,7 +218,7 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
         const plotLeft = 44.0;
         const plotRightPad = 44.0;
         final plotRight = width - plotRightPad;
-        const topPad = 10.0;
+        const topPad = 24.0;
         const bottomPad = 22.0;
 
         return GestureDetector(
@@ -248,24 +259,24 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
               size: Size(width, height),
               painter: _GraphPainter(
                 distances: _distances,
-                elevations: _elevations,
-                powers: _powers,
                 viewStart: _viewStart,
                 viewEnd: _viewEnd,
                 cursorDist: _cursorDist,
                 rangeStart: _rangeStart,
-                showElevation: widget.showElevation,
-                showPower: widget.showPower,
-                elevMin: _elevMin,
-                elevMax: _elevMax,
-                powerMin: _powerMin,
-                powerMax: _powerMax,
+                metric1: widget.metric1,
+                metric2: widget.metric2,
+                series1: _series1,
+                series2: _series2,
+                min1: _min1,
+                max1: _max1,
+                min2: _min2,
+                max2: _max2,
                 plotLeft: plotLeft,
                 plotRight: plotRight,
                 topPad: topPad,
                 bottomPad: bottomPad,
-                elevColor: elevColor,
-                powerColor: powerColor,
+                color1: widget.color1,
+                color2: widget.color2,
                 textColor: colorScheme.onSurface,
                 gridColor: colorScheme.outline.withAlpha(60),
               ),
@@ -281,47 +292,47 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
 class _GraphPainter extends CustomPainter {
   _GraphPainter({
     required this.distances,
-    required this.elevations,
-    required this.powers,
     required this.viewStart,
     required this.viewEnd,
     required this.cursorDist,
     required this.rangeStart,
-    required this.showElevation,
-    required this.showPower,
-    required this.elevMin,
-    required this.elevMax,
-    required this.powerMin,
-    required this.powerMax,
+    required this.metric1,
+    required this.metric2,
+    required this.series1,
+    required this.series2,
+    required this.min1,
+    required this.max1,
+    required this.min2,
+    required this.max2,
     required this.plotLeft,
     required this.plotRight,
     required this.topPad,
     required this.bottomPad,
-    required this.elevColor,
-    required this.powerColor,
+    required this.color1,
+    required this.color2,
     required this.textColor,
     required this.gridColor,
   });
 
   final List<double> distances;
-  final List<double> elevations;
-  final List<double> powers;
   final double viewStart;
   final double viewEnd;
   final double? cursorDist;
   final double? rangeStart;
-  final bool showElevation;
-  final bool showPower;
-  final double elevMin;
-  final double elevMax;
-  final double powerMin;
-  final double powerMax;
+  final GraphMetric metric1;
+  final GraphMetric metric2;
+  final List<double> series1;
+  final List<double> series2;
+  final double min1;
+  final double max1;
+  final double min2;
+  final double max2;
   final double plotLeft;
   final double plotRight;
   final double topPad;
   final double bottomPad;
-  final Color elevColor;
-  final Color powerColor;
+  final Color color1;
+  final Color color2;
   final Color textColor;
   final Color gridColor;
 
@@ -329,14 +340,14 @@ class _GraphPainter extends CustomPainter {
 
   double _x(double km, double plotTop, double plotBottom) => plotLeft + ((km - viewStart) / (viewEnd - viewStart).clamp(1e-9, double.infinity)) * _plotWidth;
 
-  double _yElev(double e, double plotTop, double plotBottom) {
-    final span = (elevMax - elevMin).clamp(1e-6, double.infinity);
-    return plotBottom - ((e - elevMin) / span) * (plotBottom - plotTop);
+  double _y1(double v, double plotTop, double plotBottom) {
+    final span = (max1 - min1).clamp(1e-6, double.infinity);
+    return plotBottom - ((v - min1) / span) * (plotBottom - plotTop);
   }
 
-  double _yPower(double p, double plotTop, double plotBottom) {
-    final span = (powerMax - powerMin).clamp(1e-6, double.infinity);
-    return plotBottom - ((p - powerMin) / span) * (plotBottom - plotTop);
+  double _y2(double v, double plotTop, double plotBottom) {
+    final span = (max2 - min2).clamp(1e-6, double.infinity);
+    return plotBottom - ((v - min2) / span) * (plotBottom - plotTop);
   }
 
   @override
@@ -354,37 +365,40 @@ class _GraphPainter extends CustomPainter {
       canvas.drawLine(Offset(plotLeft, y), Offset(plotRight, y), gridPaint);
     }
 
-    // Axis labels.
-    final labelStyle = TextStyle(color: textColor, fontSize: 10);
-    if (showElevation) {
-      final span = (elevMax - elevMin).clamp(1e-6, double.infinity);
-      for (var i = 0; i <= 4; i++) {
-        final val = elevMax - span * i / 4;
-        _drawText(canvas, '${val.round()}', const Offset(2, 0), labelStyle, y: plotTop + plotH * i / 4, alignRight: false);
-      }
-    }
-    if (showPower) {
-      final span = (powerMax - powerMin).clamp(1e-6, double.infinity);
-      for (var i = 0; i <= 4; i++) {
-        final val = powerMax - span * i / 4;
-        _drawText(canvas, '${val.round()}', Offset(plotRight + 4, 0), labelStyle, y: plotTop + plotH * i / 4, alignRight: false);
-      }
+    // Title (centered at top).
+    final title = '${metric1.label} vs. ${metric2.label}';
+    _drawText(canvas, title, Offset(size.width / 2, 2), TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.bold), alignCenter: true);
+
+    // Axis titles + numeric ticks, colored per slot.
+    final labelStyle1 = TextStyle(color: color1, fontSize: 10);
+    final labelStyle2 = TextStyle(color: color2, fontSize: 10);
+    final unit1 = metric1.unit.isNotEmpty ? ' (${metric1.unit})' : '';
+    final unit2 = metric2.unit.isNotEmpty ? ' (${metric2.unit})' : '';
+    _drawText(canvas, '${metric1.label}$unit1', const Offset(2, 0), labelStyle1, y: plotTop - 2);
+    _drawText(canvas, '${metric2.label}$unit2', Offset(plotRight + 4, 0), labelStyle2, y: plotTop - 2, alignRight: true);
+    final span1 = (max1 - min1).clamp(1e-6, double.infinity);
+    final span2 = (max2 - min2).clamp(1e-6, double.infinity);
+    for (var i = 0; i <= 4; i++) {
+      final val1 = max1 - span1 * i / 4;
+      _drawText(canvas, '${val1.round()}', const Offset(2, 0), labelStyle1, y: plotTop + plotH * i / 4, alignRight: false);
+      final val2 = max2 - span2 * i / 4;
+      _drawText(canvas, '${val2.round()}', Offset(plotRight + 4, 0), labelStyle2, y: plotTop + plotH * i / 4, alignRight: false);
     }
 
     // Range-select highlight.
     if (rangeStart != null) {
       final x0 = _x(math.min(rangeStart!, viewStart), plotTop, plotBottom);
       final x1 = _x(math.max(rangeStart!, viewEnd), plotTop, plotBottom);
-      final hl = Paint()..color = elevColor.withAlpha(40);
+      final hl = Paint()..color = color1.withAlpha(40);
       canvas.drawRect(Rect.fromLTRB(x0, plotTop, x1, plotBottom), hl);
     }
 
-    // Elevation profile fill (drawn under the line).
-    if (showElevation) _drawElevationFill(canvas, plotTop, plotBottom);
+    // Slot 1 fill (under its line).
+    _drawFill(canvas, plotTop, plotBottom);
 
     // Series lines.
-    if (showElevation) _drawSeries(canvas, elevations, elevColor, plotTop, plotBottom, _yElev);
-    if (showPower) _drawSeries(canvas, powers, powerColor, plotTop, plotBottom, _yPower);
+    _drawSeries(canvas, series1, color1, plotTop, plotBottom, _y1);
+    _drawSeries(canvas, series2, color2, plotTop, plotBottom, _y2);
 
     // Cursor line.
     if (cursorDist != null && cursorDist! >= viewStart && cursorDist! <= viewEnd) {
@@ -395,11 +409,11 @@ class _GraphPainter extends CustomPainter {
       canvas.drawLine(Offset(cx, plotTop), Offset(cx, plotBottom), cursorPaint);
       // Dots at the cursor for each visible series.
       final idx = _nearestIndex(cursorDist!);
-      if (showElevation && idx < elevations.length && !elevations[idx].isNaN) {
-        _drawDot(canvas, Offset(cx, _yElev(elevations[idx], plotTop, plotBottom)), elevColor);
+      if (idx < series1.length && !series1[idx].isNaN) {
+        _drawDot(canvas, Offset(cx, _y1(series1[idx], plotTop, plotBottom)), color1);
       }
-      if (showPower && idx < powers.length) {
-        _drawDot(canvas, Offset(cx, _yPower(powers[idx], plotTop, plotBottom)), powerColor);
+      if (idx < series2.length && !series2[idx].isNaN) {
+        _drawDot(canvas, Offset(cx, _y2(series2[idx], plotTop, plotBottom)), color2);
       }
     }
 
@@ -427,9 +441,9 @@ class _GraphPainter extends CustomPainter {
     return lo;
   }
 
-  void _drawElevationFill(Canvas canvas, double plotTop, double plotBottom) {
+  void _drawFill(Canvas canvas, double plotTop, double plotBottom) {
     final paint = Paint()
-      ..color = elevColor.withAlpha(40)
+      ..color = color1.withAlpha(40)
       ..style = PaintingStyle.fill;
     Path? path;
     double? lastX;
@@ -437,13 +451,13 @@ class _GraphPainter extends CustomPainter {
     for (var i = 0; i < distances.length; i++) {
       final km = distances[i];
       if (km < viewStart || km > viewEnd) continue;
-      final e = elevations[i];
-      if (e.isNaN) {
+      final v = series1[i];
+      if (v.isNaN) {
         started = false;
         continue;
       }
       final x = _x(km, plotTop, plotBottom);
-      final y = _yElev(e, plotTop, plotBottom);
+      final y = _y1(v, plotTop, plotBottom);
       if (!started) {
         path = Path()..moveTo(x, plotBottom);
         path.lineTo(x, y);
@@ -491,7 +505,7 @@ class _GraphPainter extends CustomPainter {
     canvas.drawCircle(p, 3, Paint()..color = color);
   }
 
-  void _drawText(Canvas canvas, String text, Offset offset, TextStyle style, {bool alignRight = false, double? y}) {
+  void _drawText(Canvas canvas, String text, Offset offset, TextStyle style, {bool alignRight = false, bool alignCenter = false, double? y}) {
     final tp = TextPainter(
       text: TextSpan(text: text, style: style),
       textDirection: ui.TextDirection.ltr,
@@ -499,6 +513,7 @@ class _GraphPainter extends CustomPainter {
     tp.layout();
     var dx = offset.dx;
     if (alignRight) dx = offset.dx - tp.width;
+    if (alignCenter) dx = offset.dx - tp.width / 2;
     final dy = y != null ? y - tp.height / 2 : offset.dy;
     tp.paint(canvas, Offset(dx, dy));
   }
@@ -509,9 +524,9 @@ class _GraphPainter extends CustomPainter {
       old.viewEnd != viewEnd ||
       old.cursorDist != cursorDist ||
       old.rangeStart != rangeStart ||
-      old.showElevation != showElevation ||
-      old.showPower != showPower ||
+      old.metric1 != metric1 ||
+      old.metric2 != metric2 ||
       old.distances != distances ||
-      old.elevations != elevations ||
-      old.powers != powers;
+      old.series1 != series1 ||
+      old.series2 != series2;
 }
