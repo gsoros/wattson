@@ -1,12 +1,11 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
-
 import 'package:drift/drift.dart' show Value, OrderingTerm, OrderingMode;
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../data/database.dart';
+import '../util/app_log.dart';
 import '../util/ride_title_generator.dart';
 import '../models/recording_state.dart';
 import '../models/telemetry.dart';
@@ -45,6 +44,9 @@ class _RideStats {
 /// written — no interpolation; the nearest fix is good enough for ~1 Hz CTS.
 class RecordingService {
   RecordingService({required AppDatabase database, required this._telemetryStream}) : _db = database;
+
+  /// Module logger (auto-captures caller class + file:line).
+  static final _log = AppLog.logFor('RecordingService');
 
   final AppDatabase _db;
   final Stream<Telemetry> _telemetryStream;
@@ -85,7 +87,7 @@ class RecordingService {
   Future<void> start({int? rideId}) async {
     if (_state.isActive) return;
 
-    debugPrint('[RecordingService] starting ride #${rideId ?? 'new'}');
+    _log.d('starting ride #${rideId ?? 'new'}');
 
     // Emit recording state immediately so the UI swaps to pause/stop buttons
     // without waiting for the async setup below.
@@ -110,7 +112,7 @@ class RecordingService {
       final newId = await _db.into(_db.rides).insert(RidesCompanion.insert(startTime: DateTime.now()));
       _state = _state.copyWith(rideId: newId);
       _stateController.add(_state);
-      debugPrint('[RecordingService] inserted new ride #$newId');
+      _log.d('inserted new ride #$newId');
     }
 
     onRideMutation?.call();
@@ -144,7 +146,7 @@ class RecordingService {
     if (!_state.isActive) return;
 
     final rideId = _state.rideId;
-    debugPrint('[RecordingService] stopping ride #$rideId');
+    _log.d('stopping ride #$rideId');
 
     _telemetrySub?.cancel();
     _telemetrySub = null;
@@ -187,14 +189,14 @@ class RecordingService {
         title: existing.title?.isNotEmpty == true ? const Value.absent() : Value(generateRideTitle(finalized)),
       ),
     );
-    debugPrint('[RecordingService] ride #$rideId finalized in DB');
+    _log.d('ride #$rideId finalized in DB');
 
     // Reset specific state fields only
     // _state = _state.copyWith(status: RecordingStatus.idle, rideId: null, timeInMotion: Duration.zero, distanceKm: 0, elevationGainM: 0);
     // Reset all state fields
     _state = RecordingState();
     _stateController.add(_state);
-    debugPrint('[RecordingService] state emitted: idle, rideId=null');
+    _log.d('state emitted: idle, rideId=null');
 
     onRideMutation?.call();
 
@@ -205,7 +207,7 @@ class RecordingService {
     _gpsSub?.cancel();
     _gpsSub = null;
 
-    debugPrint('[RecordingService] stopped');
+    _log.d('stopped');
   }
 
   /// Computes summary statistics from a ride's telemetry samples.
@@ -288,12 +290,12 @@ class RecordingService {
   ///
   /// Bumps [onRideMutation] so the ride history list re-fetches.
   Future<void> deleteRide(int rideId) async {
-    debugPrint('[RecordingService] deleting ride #$rideId and its samples');
+    _log.d('deleting ride #$rideId and its samples');
     await _db.transaction(() async {
       await (_db.delete(_db.samples)..where((s) => s.rideId.equals(rideId))).go();
       await (_db.delete(_db.rides)..where((r) => r.id.equals(rideId))).go();
     });
-    debugPrint('[RecordingService] ride #$rideId deleted');
+    _log.d('ride #$rideId deleted');
     onRideMutation?.call();
   }
 
@@ -319,7 +321,7 @@ class RecordingService {
 
     if (age.inHours <= 4) {
       // Resume recording this ride.
-      debugPrint('[RecordingService] Resuming orphan ride #${ride.id} (last sample ${age.inMinutes}m ago)');
+      _log.d('Resuming orphan ride #${ride.id} (last sample ${age.inMinutes}m ago)');
 
       // Compute initial accumulators from existing samples.
       final allSamples = await (_db.select(_db.samples)..where((s) => s.rideId.equals(ride.id))).get();
@@ -342,7 +344,7 @@ class RecordingService {
       await start(rideId: ride.id);
     } else {
       // Close the orphan ride at the last known data point.
-      debugPrint('[RecordingService] Closing stale orphan ride #${ride.id} (last sample ${age.inHours}h ago)');
+      _log.d('Closing stale orphan ride #${ride.id} (last sample ${age.inHours}h ago)');
 
       // Compute summary stats from samples.
       final allSamples = await (_db.select(_db.samples)..where((s) => s.rideId.equals(ride.id))).get();
@@ -439,7 +441,7 @@ class RecordingService {
     _stateController.add(_state);
 
     if (_state.rideId == null) {
-      //debugPrint('[RecordingService] rideId is null, dropping sample');
+      //_log.d('rideId is null, dropping sample');
     } else {
       // Write a sample row.
       _db

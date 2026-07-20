@@ -116,6 +116,9 @@ class _DeviceTile extends ConsumerWidget {
   const _DeviceTile({required this.device});
   final BleScanResult device;
 
+  /// Module logger (auto-captures caller class + file:line).
+  static final _log = AppLog.logFor('SettingsPage');
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -165,7 +168,7 @@ class _DeviceTile extends ConsumerWidget {
                 } else if (isHrm) {
                   service.disconnectHrm();
                 } else {
-                  debugPrint('[SettingsPage Disconnect button] Unknown device type: $device');
+                  _log.w('Disconnect button: Unknown device type: $device');
                   // We are connected to an unknown device type, so forget it.
                   service.forgetDevice(device.deviceId);
                 }
@@ -202,7 +205,7 @@ class _DeviceTile extends ConsumerWidget {
         ),
         onDismissed: (_) {
           // Forget this device: remove from cache and app storage.
-          debugPrint('[SettingsPage Dismiss] Forgetting device: $device');
+          _log.d('Dismiss: Forgetting device: $device');
           service.forgetDevice(device.deviceId);
         },
         child: tile,

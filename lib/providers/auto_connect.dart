@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../ble/ble_service.dart';
+import '../util/app_log.dart';
 
 /// Orchestrates auto-connect on launch and periodic rescans.
 ///
@@ -14,6 +14,9 @@ class AutoConnectManager {
   AutoConnectManager(this._service) {
     _run();
   }
+
+  /// Module logger (auto-captures caller class + file:line).
+  static final _log = AppLog.logFor('AutoConnect');
 
   final BleService _service;
   Timer? _rescanTimer;
@@ -40,27 +43,27 @@ class AutoConnectManager {
     final hrmName = prefs.getString('preferred_hrm_name');
 
     if (dashMac == null && hrmMac == null) {
-      debugPrint('[AutoConnect] no stored MACs');
+      _log.d('no stored MACs');
       return;
     }
 
     if (_service.isScanning) {
-      debugPrint('[AutoConnect] already scanning');
+      _log.d('already scanning');
       return;
     }
 
-    debugPrint('[AutoConnect] starting scan for stored devices...');
+    _log.d('starting scan for stored devices...');
     await _service.startScan();
 
     // Give the scan a moment to find devices, then connect.
     await Future.delayed(const Duration(seconds: 3));
 
     if (dashMac != null && !_service.dashConnected) {
-      debugPrint('[AutoConnect] connecting to Dash: $dashName ($dashMac)');
+      _log.d('connecting to Dash: $dashName ($dashMac)');
       await _service.connectToDash(dashMac, name: dashName);
     }
     if (hrmMac != null && !_service.hrmConnected) {
-      debugPrint('[AutoConnect] connecting to HRM: $hrmMac');
+      _log.d('connecting to HRM: $hrmMac');
       await _service.connectToHrm(hrmMac, name: hrmName);
     }
   }

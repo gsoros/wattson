@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/telemetry.dart';
+import '../util/app_log.dart';
 import 'ble_service.dart';
 import 'ble_scan_result.dart';
 import 'cts_parser.dart';
@@ -24,6 +25,9 @@ class RealBleService implements BleService {
     FlutterBluePlus.setLogLevel(LogLevel.error);
     _seedKnownDevices();
   }
+
+  /// Module logger (auto-captures caller class + file:line).
+  static final _log = AppLog.logFor('RealBle');
 
   /// How long to scan before automatically stopping.
   final Duration scanTimeout;
@@ -52,7 +56,7 @@ class RealBleService implements BleService {
   bool get dashConnected => _dashConnected;
   @override
   set dashConnected(bool value) {
-    debugPrint('[RealBle] dashConnected: $value');
+    _log.d('dashConnected: $value');
     _dashConnected = value;
   }
 
@@ -66,7 +70,7 @@ class RealBleService implements BleService {
   bool get hrmConnected => _hrmConnected;
   @override
   set hrmConnected(bool value) {
-    debugPrint('[RealBle] hrmConnected: $value');
+    _log.d('hrmConnected: $value');
     _hrmConnected = value;
   }
 
@@ -111,28 +115,28 @@ class RealBleService implements BleService {
   Future<void> startScan() async {
     if (_disposed) return;
     if (_scanning) {
-      debugPrint('[RealBle] startScan: already scanning');
+      _log.d('startScan: already scanning');
       return;
     }
 
     if (!await _requestBlePermissions()) {
-      debugPrint('[RealBle] startScan: permissions not granted');
+      _log.d('startScan: permissions not granted');
       return;
     }
 
     // Wait for adapter to be on.
     if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
-      debugPrint('[RealBle] startScan: waiting for adapter...');
+      _log.d('startScan: waiting for adapter...');
       try {
         await FlutterBluePlus.adapterState.where((s) => s == BluetoothAdapterState.on).first.timeout(const Duration(seconds: 30));
       } catch (_) {
-        debugPrint('[RealBle] startScan: adapter never became ready');
+        _log.d('startScan: adapter never became ready');
         return;
       }
     }
 
     _scanning = true;
-    debugPrint('[RealBle] startScan: starting scan');
+    _log.d('startScan: starting scan');
 
     // Subscribe to results before startScan.
     _scanSub?.cancel();
@@ -143,7 +147,7 @@ class RealBleService implements BleService {
     try {
       await FlutterBluePlus.startScan(timeout: scanTimeout);
     } catch (e) {
-      debugPrint('[RealBle] startScan error: $e');
+      _log.e('startScan error: $e', error: e);
       _scanning = false;
     }
 
@@ -159,7 +163,7 @@ class RealBleService implements BleService {
   @override
   Future<void> stopScan() async {
     if (!_scanning) return;
-    debugPrint('[RealBle] stopScan');
+    _log.d('stopScan');
     _scanning = false;
     _scanCancelTimer?.cancel();
     _scanCancelTimer = null;
@@ -227,7 +231,7 @@ class RealBleService implements BleService {
   Future<void> connectToDash(String deviceId, {String? name}) async {
     if (_disposed) return;
     if (dashConnected) {
-      debugPrint('[RealBle] connectToDash: already connected');
+      _log.d('connectToDash: already connected');
       return;
     }
 
@@ -236,14 +240,14 @@ class RealBleService implements BleService {
     // Find the device by remote ID.
     final device = await _findDeviceById(deviceId);
     if (device == null) {
-      debugPrint('[RealBle] connectToDash: device $deviceId not found');
+      _log.d('connectToDash: device $deviceId not found');
       _dashStateController.add(BleConnectionState.disconnected);
       return;
     }
 
     _dashDevice = device;
     _dashStateController.add(BleConnectionState.connecting);
-    debugPrint('[RealBle] connectToDash: found ${device.remoteId}');
+    _log.d('connectToDash: found ${device.remoteId}');
 
     // Persist the MAC and name.
     final prefs = await SharedPreferences.getInstance();
@@ -254,7 +258,7 @@ class RealBleService implements BleService {
     _dashConnEventSub?.cancel();
     _dashConnEventSub = FlutterBluePlus.events.onConnectionStateChanged.listen((event) {
       if (event.device.remoteId == device.remoteId && event.connectionState == BluetoothConnectionState.disconnected) {
-        debugPrint('[RealBle] Dash disconnected');
+        _log.d('Dash disconnected');
         dashConnected = false;
         _dashStateController.add(BleConnectionState.disconnected);
         _onDashDisconnected();
@@ -264,9 +268,9 @@ class RealBleService implements BleService {
     // Connect.
     try {
       await device.connect(license: License.nonprofit, mtu: 247);
-      debugPrint('[RealBle] Dash connected');
+      _log.d('Dash connected');
     } catch (e) {
-      debugPrint('[RealBle] Dash connect failed: $e');
+      _log.e('Dash connect failed: $e', error: e);
       _dashStateController.add(BleConnectionState.disconnected);
       return;
     }
@@ -276,7 +280,7 @@ class RealBleService implements BleService {
     try {
       services = await device.discoverServices();
     } catch (e) {
-      debugPrint('[RealBle] Dash discoverServices failed: $e');
+      _log.e('Dash discoverServices failed: $e', error: e);
       await device.disconnect();
       _dashStateController.add(BleConnectionState.disconnected);
       return;
@@ -310,14 +314,20 @@ class RealBleService implements BleService {
       await ctsChar.setNotifyValue(true);
       _ctsSub?.cancel();
       _ctsSub = ctsChar.onValueReceived.listen(_onCtsValue);
-      try {
-        final initial = await ctsChar.read();
-        if (initial.isNotEmpty) _onCtsValue(initial);
-      } catch (e) {
-        debugPrint('[RealBle] CTS initial read failed: $e');
+      // Only attempt the one-time initial read if the (possibly cached) GATT
+      // table advertises READ. Android caches the service list across reconnects,
+      // so after a firmware update that adds READ this may be false until the
+      // device is forgotten & re-paired — in that case NOTIFY still delivers data.
+      if (ctsChar.properties.read) {
+        try {
+          final initial = await ctsChar.read();
+          if (initial.isNotEmpty) _onCtsValue(initial);
+        } catch (e) {
+          _log.e('CTS initial read failed: $e', error: e);
+        }
       }
     } else {
-      debugPrint('[RealBle] WARNING: CTS telemetry char not found');
+      _log.w('WARNING: CTS telemetry char not found');
     }
 
     // Subscribe to NUS TX.
@@ -327,14 +337,14 @@ class RealBleService implements BleService {
       _nusTxSub?.cancel();
       _nusTxSub = nusTx.onValueReceived.listen(_onNusTxValue);
     } else {
-      debugPrint('[RealBle] WARNING: NUS TX char not found');
+      _log.w('WARNING: NUS TX char not found');
     }
 
     dashConnected = true;
     _dashStateController.add(BleConnectionState.connected);
     _updateConnectedFlag(deviceId, true);
     _updateKnownDevice(deviceId, name: device.advName.isNotEmpty ? device.advName : device.platformName, appearance: 0x0480);
-    debugPrint('[RealBle] connectToDash: done');
+    _log.d('connectToDash: done');
   }
 
   @override
@@ -390,7 +400,7 @@ class RealBleService implements BleService {
   Future<void> connectToHrm(String deviceId, {String? name}) async {
     if (_disposed) return;
     if (hrmConnected) {
-      debugPrint('[RealBle] connectToHrm: already connected');
+      _log.d('connectToHrm: already connected');
       return;
     }
 
@@ -398,14 +408,14 @@ class RealBleService implements BleService {
 
     final device = await _findDeviceById(deviceId);
     if (device == null) {
-      debugPrint('[RealBle] connectToHrm: device $deviceId not found');
+      _log.d('connectToHrm: device $deviceId not found');
       _hrmStateController.add(BleConnectionState.disconnected);
       return;
     }
 
     _hrmDevice = device;
     _hrmStateController.add(BleConnectionState.connecting);
-    debugPrint('[RealBle] connectToHrm: found ${device.remoteId}');
+    _log.d('connectToHrm: found ${device.remoteId}');
 
     // Persist the MAC and name.
     final prefs = await SharedPreferences.getInstance();
@@ -416,7 +426,7 @@ class RealBleService implements BleService {
     _hrmConnEventSub?.cancel();
     _hrmConnEventSub = FlutterBluePlus.events.onConnectionStateChanged.listen((event) {
       if (event.device.remoteId == device.remoteId && event.connectionState == BluetoothConnectionState.disconnected) {
-        debugPrint('[RealBle] HRM disconnected');
+        _log.d('HRM disconnected');
         hrmConnected = false;
         _hrmStateController.add(BleConnectionState.disconnected);
         _onHrmDisconnected();
@@ -426,9 +436,9 @@ class RealBleService implements BleService {
     // Connect.
     try {
       await device.connect(license: License.nonprofit);
-      debugPrint('[RealBle] HRM connected');
+      _log.d('HRM connected');
     } catch (e) {
-      debugPrint('[RealBle] HRM connect failed: $e');
+      _log.e('HRM connect failed: $e', error: e);
       _hrmStateController.add(BleConnectionState.disconnected);
       return;
     }
@@ -438,7 +448,7 @@ class RealBleService implements BleService {
     try {
       services = await device.discoverServices();
     } catch (e) {
-      debugPrint('[RealBle] HRM discoverServices failed: $e');
+      _log.e('HRM discoverServices failed: $e', error: e);
       await device.disconnect();
       _hrmStateController.add(BleConnectionState.disconnected);
       return;
@@ -460,19 +470,19 @@ class RealBleService implements BleService {
       _hrmSub?.cancel();
       _hrmSub = hrmChar.onValueReceived.listen(_onHrmValue);
     } else {
-      debugPrint('[RealBle] WARNING: HRM char not found');
+      _log.w('WARNING: HRM char not found');
     }
 
     hrmConnected = true;
     _hrmStateController.add(BleConnectionState.connected);
     _updateConnectedFlag(deviceId, true);
     _updateKnownDevice(deviceId, name: device.advName.isNotEmpty ? device.advName : device.platformName, appearance: 0x0134);
-    debugPrint('[RealBle] connectToHrm: done');
+    _log.d('connectToHrm: done');
   }
 
   @override
   Future<void> disconnectHrm() async {
-    debugPrint('[RealBle] disconnectHrm');
+    _log.d('disconnectHrm');
     final device = _hrmDevice;
     final deviceId = device?.remoteId.str;
     _hrmDevice = null;
@@ -493,7 +503,7 @@ class RealBleService implements BleService {
 
   @override
   Future<void> forgetDevice(String deviceId) async {
-    debugPrint('[RealBle] forgetDevice: $deviceId');
+    _log.d('forgetDevice: $deviceId');
     // Disconnect if connected.
     if (_dashDevice?.remoteId.str == deviceId) {
       await disconnectDash();
@@ -614,7 +624,7 @@ class RealBleService implements BleService {
       await FlutterBluePlus.startScan(timeout: scanTimeout);
       return await completer.future.timeout(scanTimeout + const Duration(seconds: 2), onTimeout: () => null);
     } catch (e) {
-      debugPrint('[RealBle] _findDeviceById error: $e');
+      _log.e('_findDeviceById error: $e', error: e);
       return null;
     } finally {
       await sub.cancel();
@@ -631,7 +641,7 @@ class RealBleService implements BleService {
     final bleResult = await [Permission.bluetoothScan, Permission.bluetoothConnect].request();
     final bleGranted = bleResult[Permission.bluetoothScan]?.isGranted == true && bleResult[Permission.bluetoothConnect]?.isGranted == true;
     if (!bleGranted) {
-      debugPrint('[RealBle] BLUETOOTH_SCAN/CONNECT not granted');
+      _log.w('BLUETOOTH_SCAN/CONNECT not granted');
       return false;
     }
 

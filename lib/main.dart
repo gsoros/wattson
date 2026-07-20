@@ -10,8 +10,9 @@ import 'util/app_log.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Capture debugPrint + uncaught errors to a persistent file so crashes can
-  // be reproduced/diagnosed later (shared from Settings).
+  // Capture structured logs + uncaught errors to a persistent file so crashes
+  // can be reproduced/diagnosed later (shared from Settings). Per-module
+  // levels can be tuned via AppLog.moduleLevels.
   AppLog.init();
 
   // Load the persisted Thunderforest API key for the Map tab before the UI
