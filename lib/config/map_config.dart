@@ -57,6 +57,9 @@ enum MapSource {
 /// [Sample] via [value] (returning [double.nan] when unavailable, e.g. missing
 /// GPS elevation). The two graph slots each hold a [GraphMetric].
 enum GraphMetric {
+  /// No metric — the slot is hidden and contributes nothing to the graph.
+  none('None', ''),
+
   elevation('Elevation', 'm'),
   speed('Speed', 'km/h'),
   humanPower('Human Power', 'W'),
@@ -80,6 +83,8 @@ enum GraphMetric {
   /// Reads this metric's value from [s], or [double.nan] if unavailable.
   double value(Sample s) {
     switch (this) {
+      case GraphMetric.none:
+        return double.nan;
       case GraphMetric.elevation:
         return s.elevation ?? double.nan;
       case GraphMetric.speed:

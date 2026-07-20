@@ -218,7 +218,7 @@ class _RideOverlayGraphState extends State<RideOverlayGraph> {
         const plotLeft = 44.0;
         const plotRightPad = 44.0;
         final plotRight = width - plotRightPad;
-        const topPad = 24.0;
+        const topPad = 16.0;
         const bottomPad = 22.0;
 
         return GestureDetector(
@@ -365,24 +365,29 @@ class _GraphPainter extends CustomPainter {
       canvas.drawLine(Offset(plotLeft, y), Offset(plotRight, y), gridPaint);
     }
 
-    // Title (centered at top).
-    final title = '${metric1.label} vs. ${metric2.label}';
-    _drawText(canvas, title, Offset(size.width / 2, 2), TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.bold), alignCenter: true);
-
-    // Axis titles + numeric ticks, colored per slot.
+    // Axis titles + numeric ticks, colored per slot (skipped when a slot is
+    // "None", so it contributes no axis or series to the graph).
+    final show1 = metric1 != GraphMetric.none;
+    final show2 = metric2 != GraphMetric.none;
     final labelStyle1 = TextStyle(color: color1, fontSize: 10);
     final labelStyle2 = TextStyle(color: color2, fontSize: 10);
     final unit1 = metric1.unit.isNotEmpty ? ' (${metric1.unit})' : '';
     final unit2 = metric2.unit.isNotEmpty ? ' (${metric2.unit})' : '';
-    _drawText(canvas, '${metric1.label}$unit1', const Offset(2, 0), labelStyle1, y: plotTop - 2);
-    _drawText(canvas, '${metric2.label}$unit2', Offset(plotRight + 4, 0), labelStyle2, y: plotTop - 2, alignRight: true);
-    final span1 = (max1 - min1).clamp(1e-6, double.infinity);
-    final span2 = (max2 - min2).clamp(1e-6, double.infinity);
-    for (var i = 0; i <= 4; i++) {
-      final val1 = max1 - span1 * i / 4;
-      _drawText(canvas, '${val1.round()}', const Offset(2, 0), labelStyle1, y: plotTop + plotH * i / 4, alignRight: false);
-      final val2 = max2 - span2 * i / 4;
-      _drawText(canvas, '${val2.round()}', Offset(plotRight + 4, 0), labelStyle2, y: plotTop + plotH * i / 4, alignRight: false);
+    if (show1) {
+      _drawText(canvas, '${metric1.label}$unit1', const Offset(2, 0), labelStyle1, y: plotTop - 2);
+      final span1 = (max1 - min1).clamp(1e-6, double.infinity);
+      for (var i = 0; i <= 4; i++) {
+        final val1 = max1 - span1 * i / 4;
+        _drawText(canvas, '${val1.round()}', const Offset(2, 0), labelStyle1, y: plotTop + plotH * i / 4, alignRight: false);
+      }
+    }
+    if (show2) {
+      _drawText(canvas, '${metric2.label}$unit2', Offset(plotRight + 4, 0), labelStyle2, y: plotTop - 2, alignRight: true);
+      final span2 = (max2 - min2).clamp(1e-6, double.infinity);
+      for (var i = 0; i <= 4; i++) {
+        final val2 = max2 - span2 * i / 4;
+        _drawText(canvas, '${val2.round()}', Offset(plotRight + 4, 0), labelStyle2, y: plotTop + plotH * i / 4, alignRight: false);
+      }
     }
 
     // Range-select highlight.
@@ -394,11 +399,11 @@ class _GraphPainter extends CustomPainter {
     }
 
     // Slot 1 fill (under its line).
-    _drawFill(canvas, plotTop, plotBottom);
+    if (show1) _drawFill(canvas, plotTop, plotBottom);
 
     // Series lines.
-    _drawSeries(canvas, series1, color1, plotTop, plotBottom, _y1);
-    _drawSeries(canvas, series2, color2, plotTop, plotBottom, _y2);
+    if (show1) _drawSeries(canvas, series1, color1, plotTop, plotBottom, _y1);
+    if (show2) _drawSeries(canvas, series2, color2, plotTop, plotBottom, _y2);
 
     // Cursor line.
     if (cursorDist != null && cursorDist! >= viewStart && cursorDist! <= viewEnd) {
@@ -409,10 +414,10 @@ class _GraphPainter extends CustomPainter {
       canvas.drawLine(Offset(cx, plotTop), Offset(cx, plotBottom), cursorPaint);
       // Dots at the cursor for each visible series.
       final idx = _nearestIndex(cursorDist!);
-      if (idx < series1.length && !series1[idx].isNaN) {
+      if (show1 && idx < series1.length && !series1[idx].isNaN) {
         _drawDot(canvas, Offset(cx, _y1(series1[idx], plotTop, plotBottom)), color1);
       }
-      if (idx < series2.length && !series2[idx].isNaN) {
+      if (show2 && idx < series2.length && !series2[idx].isNaN) {
         _drawDot(canvas, Offset(cx, _y2(series2[idx], plotTop, plotBottom)), color2);
       }
     }

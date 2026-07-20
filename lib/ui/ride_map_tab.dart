@@ -11,8 +11,8 @@ import 'ride_overlay_graph.dart';
 ///
 /// Renders the recorded GPS track as a polyline over a tile layer (selected in
 /// Map Settings). A gear button (top-right) opens a semi-transparent Map
-/// Settings overlay. When at least one overlay toggle is enabled, a
-/// semi-transparent combined Elevation/Power graph is drawn at the bottom; its
+/// Settings overlay. When at least one graph metric slot is configured (not
+/// "None"), a semi-transparent combined graph is drawn at the bottom; its
 /// cursor drives a dot on the map, and pinch/range zooming the graph zooms the
 /// map to the same distance window.
 class RideMapTab extends StatefulWidget {
@@ -176,22 +176,24 @@ class _RideMapTabState extends State<RideMapTab> {
             child: IconButton(icon: const Icon(Icons.settings), tooltip: 'Map settings', onPressed: () => setState(() => _showSettings = !_showSettings)),
           ),
         ),
-        // Bottom combined graph (two selectable metric slots).
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: RideOverlayGraph(
-            samples: _gpsSamples,
-            metric1: MapConfig.graphMetric1,
-            metric2: MapConfig.graphMetric2,
-            color1: theme.colorScheme.primary,
-            color2: theme.colorScheme.tertiary,
-            onCursorChanged: (km) => setState(() => _cursorDist = km),
-            onViewRangeChanged: _fitToRange,
-            onResetView: _resetView,
+        // Bottom combined graph (two selectable metric slots). Only shown when
+        // at least one slot is configured (not "None").
+        if (MapConfig.graphMetric1 != GraphMetric.none || MapConfig.graphMetric2 != GraphMetric.none)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: RideOverlayGraph(
+              samples: _gpsSamples,
+              metric1: MapConfig.graphMetric1,
+              metric2: MapConfig.graphMetric2,
+              color1: theme.colorScheme.primary,
+              color2: theme.colorScheme.tertiary,
+              onCursorChanged: (km) => setState(() => _cursorDist = km),
+              onViewRangeChanged: _fitToRange,
+              onResetView: _resetView,
+            ),
           ),
-        ),
         // Map Settings overlay — drawn last so it sits above the graph.
         if (_showSettings) MapSettingsOverlay(onChanged: () => setState(() {}), onClose: () => setState(() => _showSettings = false)),
         // Tile attribution (top-left, above the graph so it's never obscured).

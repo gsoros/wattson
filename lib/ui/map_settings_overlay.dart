@@ -189,7 +189,7 @@ class _MapSettingsOverlayState extends State<MapSettingsOverlay> {
                       isExpanded: true,
                       items: [
                         for (final m in GraphMetric.values)
-                          if (m != MapConfig.graphMetric2) DropdownMenuItem(value: m, child: Text(m.label)),
+                          if (m == GraphMetric.none || m != MapConfig.graphMetric2) DropdownMenuItem(value: m, child: Text(m.label)),
                       ],
                       onChanged: (m) async {
                         if (m == null) return;
@@ -208,7 +208,7 @@ class _MapSettingsOverlayState extends State<MapSettingsOverlay> {
                       isExpanded: true,
                       items: [
                         for (final m in GraphMetric.values)
-                          if (m != MapConfig.graphMetric1) DropdownMenuItem(value: m, child: Text(m.label)),
+                          if (m == GraphMetric.none || m != MapConfig.graphMetric1) DropdownMenuItem(value: m, child: Text(m.label)),
                       ],
                       onChanged: (m) async {
                         if (m == null) return;
