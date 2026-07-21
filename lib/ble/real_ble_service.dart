@@ -10,6 +10,8 @@ import '../util/app_log.dart';
 import 'ble_service.dart';
 import 'ble_scan_result.dart';
 import 'cts_parser.dart';
+import 'nus_command_queue.dart';
+import 'nus_protocol.dart';
 import 'telemetry_store.dart';
 
 /// Real BLE service using flutter_blue_plus.
@@ -74,11 +76,9 @@ class RealBleService implements BleService {
     _hrmConnected = value;
   }
 
-  // -- NUS reply reassembly state --
+  // -- NUS command queue --
+  final NusCommandQueue _nusCmdQueue = NusCommandQueue();
   StreamSubscription<List<int>>? _nusTxSub;
-  int? _nusExpectedLen;
-  final List<int> _nusBuffer = [];
-  Completer<String>? _nusCompleter;
 
   // -- Scan state --
   bool _scanning = false;
@@ -335,10 +335,13 @@ class RealBleService implements BleService {
     if (nusTx != null) {
       await nusTx.setNotifyValue(true);
       _nusTxSub?.cancel();
-      _nusTxSub = nusTx.onValueReceived.listen(_onNusTxValue);
+      _nusTxSub = nusTx.onValueReceived.listen(_nusCmdQueue.onNusTxData);
     } else {
       _log.w('WARNING: NUS TX char not found');
     }
+
+    // Set the NUS RX char on the command queue.
+    _nusCmdQueue.setNusRxChar(_nusRxChar);
 
     dashConnected = true;
     _dashStateController.add(BleConnectionState.connected);
@@ -386,10 +389,7 @@ class RealBleService implements BleService {
     _nusTxSub = null;
     _dashConnEventSub?.cancel();
     _dashConnEventSub = null;
-    _nusCompleter?.completeError('disconnected');
-    _nusCompleter = null;
-    _nusBuffer.clear();
-    _nusExpectedLen = null;
+    _nusCmdQueue.cancelAll();
   }
 
   // ---------------------------------------------------------------------------
@@ -545,25 +545,8 @@ class RealBleService implements BleService {
   // ---------------------------------------------------------------------------
 
   @override
-  Future<String?> sendCommand(String line) async {
-    final rx = _nusRxChar;
-    if (rx == null) return null;
-
-    await rx.write(line.codeUnits, withoutResponse: false);
-
-    final completer = Completer<String>();
-    _nusCompleter = completer;
-    _nusBuffer.clear();
-    _nusExpectedLen = null;
-
-    try {
-      return await completer.future.timeout(const Duration(seconds: 5));
-    } on TimeoutException {
-      _nusCompleter = null;
-      _nusBuffer.clear();
-      _nusExpectedLen = null;
-      return null;
-    }
+  Future<NusReply?> sendCommand(String line) async {
+    return _nusCmdQueue.enqueue(line);
   }
 
   @override
@@ -680,26 +663,6 @@ class RealBleService implements BleService {
       // Ignore malformed payloads.
     } on CtsVersionException {
       // Ignore unknown versions; forward-compat.
-    }
-  }
-
-  void _onNusTxValue(List<int> data) {
-    if (_nusCompleter == null) return;
-
-    if (_nusExpectedLen == null) {
-      if (data.length < 2) return;
-      _nusExpectedLen = (data[0] << 8) | data[1];
-      _nusBuffer.addAll(data.sublist(2));
-    } else {
-      _nusBuffer.addAll(data);
-    }
-
-    if (_nusBuffer.length >= _nusExpectedLen!) {
-      final reply = String.fromCharCodes(_nusBuffer.take(_nusExpectedLen!));
-      _nusCompleter!.complete(reply);
-      _nusCompleter = null;
-      _nusBuffer.clear();
-      _nusExpectedLen = null;
     }
   }
 

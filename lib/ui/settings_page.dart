@@ -5,6 +5,7 @@ import '../ble/ble_service.dart';
 import '../ble/ble_scan_result.dart';
 import '../providers/ble_provider.dart';
 import '../util/app_log.dart';
+import 'device_settings_dialog.dart';
 
 /// Settings page showing BLE scan results with connect/disconnect controls.
 class SettingsPage extends ConsumerStatefulWidget {
@@ -145,22 +146,35 @@ class _DeviceTile extends ConsumerWidget {
         ],
       ),
       trailing: isConnected
-          ? OutlinedButton(
-              onPressed: () {
-                if (isCyclingComputer) {
-                  service.disconnectDash();
-                } else if (isHrm) {
-                  service.disconnectHrm();
-                } else {
-                  _log.w('Disconnect button: Unknown device type: $device');
-                  // We are connected to an unknown device type, so forget it.
-                  service.forgetDevice(device.deviceId);
-                }
-                service.stopScan();
-                service.startScan();
-              },
-              style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Disconnect'),
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isCyclingComputer)
+                  IconButton(
+                    icon: const Icon(Icons.settings),
+                    tooltip: 'Device Settings',
+                    onPressed: () {
+                      showDialog(context: context, builder: (_) => const DeviceSettingsDialog());
+                    },
+                  ),
+                OutlinedButton(
+                  onPressed: () {
+                    if (isCyclingComputer) {
+                      service.disconnectDash();
+                    } else if (isHrm) {
+                      service.disconnectHrm();
+                    } else {
+                      _log.w('Disconnect button: Unknown device type: $device');
+                      // We are connected to an unknown device type, so forget it.
+                      service.forgetDevice(device.deviceId);
+                    }
+                    service.stopScan();
+                    service.startScan();
+                  },
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('Disconnect'),
+                ),
+              ],
             )
           : canConnect
           ? FilledButton(

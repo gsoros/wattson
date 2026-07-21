@@ -4,17 +4,21 @@ import 'dart:math';
 import '../models/telemetry.dart';
 import 'ble_service.dart';
 import 'ble_scan_result.dart';
+import 'nus_protocol.dart';
 
 /// Development BLE service that simulates two virtual devices without hardware.
 ///
 /// Drives a simulated ride and optional HRM for UI/recording/export testing.
 class MockBleService implements BleService {
-  MockBleService({this.heartRateEnabled = false}) {
+  MockBleService({this.heartRateEnabled = false, this.simAvailable = false}) {
     _dashStateController.add(BleConnectionState.disconnected);
     _hrmStateController.add(BleConnectionState.disconnected);
   }
 
   final bool heartRateEnabled;
+
+  /// Whether the simulated firmware supports the `sim` command.
+  final bool simAvailable;
 
   final _scanController = StreamController<List<BleScanResult>>.broadcast();
   final _dashStateController = StreamController<BleConnectionState>.broadcast();
@@ -172,13 +176,71 @@ class MockBleService implements BleService {
   }
 
   @override
-  Future<String?> sendCommand(String line) async {
+  Future<NusReply?> sendCommand(String line) async {
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    String replyPrefix = 'API [$line] (Success)';
-    if (line.startsWith('hostname')) return '$replyPrefix ord-dev';
-    if (line.startsWith('ble')) return '$replyPrefix enabled: true, connected: true';
-    if (line.startsWith('battery')) return '$replyPrefix 720';
-    return '$replyPrefix ok';
+    final trimmed = line.trim();
+    final spaceIdx = trimmed.indexOf(' ');
+    final cmd = spaceIdx >= 0 ? trimmed.substring(0, spaceIdx) : trimmed;
+    final args = spaceIdx >= 0 ? trimmed.substring(spaceIdx + 1).trim() : '';
+
+    // Hostname
+    if (cmd == 'hostname') {
+      if (args.isEmpty) return NusReply(command: 'hostname', data: 'ord-dev');
+      return NusReply(command: 'hostname', args: args, data: args);
+    }
+
+    // Battery
+    if (cmd == 'battery') {
+      if (args.isEmpty) return NusReply(command: 'battery', data: '720');
+      return NusReply(command: 'battery', args: args, data: 'Battery capacity set to $args Wh');
+    }
+
+    // BLE
+    if (cmd == 'ble') {
+      if (args.isEmpty || args == 'status') {
+        return NusReply(command: 'ble', args: args, data: 'enabled: on, connected: true');
+      }
+      if (args == 'on' || args == 'off' || args == 'toggle') {
+        return NusReply(command: 'ble', args: args, data: args == 'on' ? 'on' : 'off');
+      }
+      return NusReply(command: 'ble', args: args, code: NusReplyCode.invalidArgs, data: 'Usage: ble[ on|off|toggle|status]');
+    }
+
+    // WiFi
+    if (cmd == 'wifi') {
+      if (args.isEmpty) {
+        return NusReply(command: 'wifi', data: 'sta: on, ap: off, ssid: MyWiFi, password: secret');
+      }
+      if (args == 'ssid') return NusReply(command: 'wifi', args: 'ssid', data: 'MyWiFi');
+      if (args.startsWith('ssid ')) return NusReply(command: 'wifi', args: args, data: args.substring(5));
+      if (args == 'password') return NusReply(command: 'wifi', args: 'password', data: 'secret');
+      if (args.startsWith('password ')) return NusReply(command: 'wifi', args: args, data: args.substring(9));
+      if (args == 'ap') return NusReply(command: 'wifi', args: 'ap', data: 'off');
+      if (args == 'ap on' || args == 'ap off') return NusReply(command: 'wifi', args: args, data: args.endsWith('on') ? 'on' : 'off');
+      if (args == 'on' || args == 'off' || args == 'toggle') return NusReply(command: 'wifi', args: args, data: args == 'on' ? 'on' : 'off');
+      if (args == 'status') return NusReply(command: 'wifi', args: 'status', data: 'sta: connected, ap_clients: 0');
+      return NusReply(
+        command: 'wifi',
+        args: args,
+        code: NusReplyCode.invalidArgs,
+        data: 'Usage: wifi[ on|off|toggle|ssid[ ssid]|password[ password]|ap[ on|off|toggle]|status]',
+      );
+    }
+
+    // Simulator
+    if (cmd == 'sim') {
+      if (!simAvailable) {
+        return NusReply(command: 'sim', args: args, code: NusReplyCode.unknownCommand, data: "'sim' is a mystery");
+      }
+      if (args.isEmpty || args == 'on' || args == 'off') {
+        final state = args.isEmpty ? 'off' : args;
+        return NusReply(command: 'sim', args: args, data: 'sim $state');
+      }
+      return NusReply(command: 'sim', args: args, code: NusReplyCode.invalidArgs, data: 'Usage: sim[ on|off]');
+    }
+
+    // Unknown command
+    return NusReply(command: cmd, args: args, code: NusReplyCode.unknownCommand, data: "'$cmd' is a mystery");
   }
 
   @override

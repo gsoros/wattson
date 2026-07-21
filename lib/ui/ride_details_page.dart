@@ -162,7 +162,6 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
   Widget build(BuildContext context) {
     final ride = _ride;
     final duration = ride.endTime?.difference(ride.startTime);
-    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(

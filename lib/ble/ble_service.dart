@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../models/telemetry.dart';
 import 'ble_scan_result.dart';
+import 'nus_protocol.dart';
 
 /// Connection lifecycle states for a single device slot.
 enum BleConnectionState { disabled, scanning, connecting, connected, disconnected }
@@ -76,8 +77,8 @@ abstract class BleService {
   // -- NUS command (Dash) --
 
   /// Send a command line to the Dash over NUS (e.g. "hostname", "ble status").
-  /// Returns the formatted API reply string, or null if NUS is unavailable.
-  Future<String?> sendCommand(String line);
+  /// Returns the parsed [NusReply], or null if NUS is unavailable.
+  Future<NusReply?> sendCommand(String line);
 
   // -- HR write (Dash) --
 
