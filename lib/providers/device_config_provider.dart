@@ -60,8 +60,10 @@ class DeviceConfigNotifier extends Notifier<DeviceConfigState> {
     final service = _getService();
     if (service == null) return;
 
-    // Mark all fields in-progress with a single state update.
-    state = state.copyWith(
+    // Clear stale state immediately — device may have rebooted, old errors
+    // and stale values should not linger for even one frame.
+    state = DeviceConfigState(
+      config: state.config.copyWith(simAvailable: false, simEnabled: null),
       inProgress: {DeviceConfigField.hostname, DeviceConfigField.batteryCapacity, DeviceConfigField.bleEnabled, DeviceConfigField.wifiSsid},
       errors: {},
     );
@@ -91,7 +93,8 @@ class DeviceConfigNotifier extends Notifier<DeviceConfigState> {
     _applyResult(
       replies[DeviceConfigField.bleEnabled],
       (data) {
-        final enabledMatch = RegExp(r'enabled:\s*(\S+)').firstMatch(data);
+        // "enabled: on, connected: true" — \w+ stops at the comma.
+        final enabledMatch = RegExp(r'enabled:\s*(\w+)').firstMatch(data);
         if (enabledMatch != null) config = config.copyWith(bleEnabled: enabledMatch.group(1) == 'on');
       },
       errors,
@@ -100,8 +103,9 @@ class DeviceConfigNotifier extends Notifier<DeviceConfigState> {
     _applyResult(
       replies[DeviceConfigField.wifiSsid],
       (data) {
-        final staMatch = RegExp(r'sta:\s*(\S+)').firstMatch(data);
-        final apMatch = RegExp(r'ap:\s*(\S+)').firstMatch(data);
+        // "sta: on, ap: on, ssid: myNetwork, password: secret" — \w+ stops at commas.
+        final staMatch = RegExp(r'sta:\s*(\w+)').firstMatch(data);
+        final apMatch = RegExp(r'ap:\s*(\w+)').firstMatch(data);
         final ssidMatch = RegExp(r'ssid:\s*(.+?)(?:,\s*password:|$)').firstMatch(data);
         final pwMatch = RegExp(r'password:\s*(.+?)$').firstMatch(data);
         config = config.copyWith(

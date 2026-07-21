@@ -228,7 +228,13 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
 
     // Watch the dash connection state.
     final dashState = ref.watch(dashConnectionStateProvider).value;
+    final wasDisconnected = _disconnected;
     _disconnected = dashState != BleConnectionState.connected;
+
+    // When the device reconnects after being disconnected, re-fetch config.
+    if (wasDisconnected && !_disconnected && !_fetching) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fetchAll());
+    }
 
     // Watch the device config state.
     final state = ref.watch(deviceConfigProvider);

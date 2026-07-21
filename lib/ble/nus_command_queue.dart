@@ -189,8 +189,10 @@ class NusCommandQueue {
     try {
       await rx.write(utf8.encode(entry.command), withoutResponse: false);
     } catch (e) {
-      _log.e('write failed: $e', error: e);
-      _retryOrFail();
+      _log.e('write failed: $e — device may have rebooted', error: e);
+      // Write failure means the connection is gone (e.g. device rebooted).
+      // Retrying would just get another GATT_ERROR. Fail immediately.
+      _completeActive(NusReply(command: entry.command, code: NusReplyCode.executionError, data: 'write failed'));
       return;
     }
 
@@ -215,13 +217,20 @@ class NusCommandQueue {
   }
 
   void _retryOrFail() {
+    // If the RX char is gone (device disconnected), fail immediately.
+    if (_nusRxChar == null) {
+      _log.d('device disconnected, giving up on "$_activeCommand"');
+      _completeActive(NusReply(command: _activeCommand ?? '', code: NusReplyCode.executionError, data: 'disconnected'));
+      return;
+    }
+
     if (_activeRetries > 0) {
       _activeRetries--;
       _log.d('retrying "$_activeCommand" (${_activeRetries + 1} retries left)');
       // Re-create the completer for the retry.
       final command = _activeCommand!;
       final maxRetries = _activeRetries;
-      final completer = Completer<NusReply>();
+      final completer = Completer<NusReply?>();
       final oldCompleter = _activeCompleter!;
       _activeCompleter = completer;
       oldCompleter.complete(null); // Fail the original attempt.

@@ -311,9 +311,13 @@ class RealBleService implements BleService {
     // Subscribe to CTS telemetry.
     final ctsChar = _ctsTelemetryChar;
     if (ctsChar != null) {
-      await ctsChar.setNotifyValue(true);
-      _ctsSub?.cancel();
-      _ctsSub = ctsChar.onValueReceived.listen(_onCtsValue);
+      try {
+        await ctsChar.setNotifyValue(true);
+        _ctsSub?.cancel();
+        _ctsSub = ctsChar.onValueReceived.listen(_onCtsValue);
+      } catch (e) {
+        _log.e('CTS setNotifyValue failed: $e', error: e);
+      }
       // Only attempt the one-time initial read if the (possibly cached) GATT
       // table advertises READ. Android caches the service list across reconnects,
       // so after a firmware update that adds READ this may be false until the
@@ -333,9 +337,13 @@ class RealBleService implements BleService {
     // Subscribe to NUS TX.
     final nusTx = _nusTxChar;
     if (nusTx != null) {
-      await nusTx.setNotifyValue(true);
-      _nusTxSub?.cancel();
-      _nusTxSub = nusTx.onValueReceived.listen(_nusCmdQueue.onNusTxData);
+      try {
+        await nusTx.setNotifyValue(true);
+        _nusTxSub?.cancel();
+        _nusTxSub = nusTx.onValueReceived.listen(_nusCmdQueue.onNusTxData);
+      } catch (e) {
+        _log.e('NUS TX setNotifyValue failed: $e', error: e);
+      }
     } else {
       _log.w('WARNING: NUS TX char not found');
     }
@@ -466,9 +474,13 @@ class RealBleService implements BleService {
 
     final hrmChar = _hrmChar;
     if (hrmChar != null) {
-      await hrmChar.setNotifyValue(true);
-      _hrmSub?.cancel();
-      _hrmSub = hrmChar.onValueReceived.listen(_onHrmValue);
+      try {
+        await hrmChar.setNotifyValue(true);
+        _hrmSub?.cancel();
+        _hrmSub = hrmChar.onValueReceived.listen(_onHrmValue);
+      } catch (e) {
+        _log.e('HRM setNotifyValue failed: $e', error: e);
+      }
     } else {
       _log.w('WARNING: HRM char not found');
     }
@@ -553,7 +565,11 @@ class RealBleService implements BleService {
   Future<void> writeHeartRate(int bpm) async {
     final hr = _ctsHrChar;
     if (hr == null) return;
-    await hr.write([bpm], withoutResponse: true);
+    try {
+      await hr.write([bpm], withoutResponse: true);
+    } catch (e) {
+      _log.e('writeHeartRate failed: $e', error: e);
+    }
   }
 
   @override

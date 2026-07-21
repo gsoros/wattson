@@ -9,7 +9,8 @@ import '../util/app_log.dart';
 ///
 /// On app start, reads stored MACs from [SharedPreferences], scans, and
 /// connects to both preferred devices. While any slot is disconnected,
-/// rescans every 30 seconds (skipping if a scan is already in progress).
+/// rescans every 30 seconds (skipping if a scan is already in progress or
+/// if both slots are already connected).
 class AutoConnectManager {
   AutoConnectManager(this._service) {
     _run();
@@ -44,6 +45,12 @@ class AutoConnectManager {
 
     if (dashMac == null && hrmMac == null) {
       _log.d('no stored MACs');
+      return;
+    }
+
+    // Both slots already connected — no need to scan.
+    if (_service.dashConnected && _service.hrmConnected) {
+      _log.d('both slots connected, skipping scan');
       return;
     }
 
