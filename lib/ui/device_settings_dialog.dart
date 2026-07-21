@@ -67,18 +67,21 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
   }
 
   /// Copy values from [DeviceConfig] into the text controllers.
-  void _syncFromState() {
+  ///
+  /// Skips fields in [excludeInProgress] so we don't overwrite user input
+  /// while a command is in flight.
+  void _syncFromState({Set<DeviceConfigField> excludeInProgress = const {}}) {
     final config = ref.read(deviceConfigProvider).config;
-    if (config.hostname != null && _hostnameCtrl.text != config.hostname) {
+    if (!excludeInProgress.contains(DeviceConfigField.hostname) && config.hostname != null && _hostnameCtrl.text != config.hostname) {
       _hostnameCtrl.text = config.hostname!;
     }
-    if (config.wifiSsid != null && _wifiSsidCtrl.text != config.wifiSsid) {
+    if (!excludeInProgress.contains(DeviceConfigField.wifiSsid) && config.wifiSsid != null && _wifiSsidCtrl.text != config.wifiSsid) {
       _wifiSsidCtrl.text = config.wifiSsid!;
     }
-    if (config.wifiPassword != null && _wifiPasswordCtrl.text != config.wifiPassword) {
+    if (!excludeInProgress.contains(DeviceConfigField.wifiPassword) && config.wifiPassword != null && _wifiPasswordCtrl.text != config.wifiPassword) {
       _wifiPasswordCtrl.text = config.wifiPassword!;
     }
-    if (config.batteryCapacityWh != null) {
+    if (!excludeInProgress.contains(DeviceConfigField.batteryCapacity) && config.batteryCapacityWh != null) {
       final text = config.batteryCapacityWh.toString();
       if (_batteryCtrl.text != text) _batteryCtrl.text = text;
     }
@@ -233,9 +236,11 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
     final inProgress = state.inProgress;
     final errors = state.errors;
 
-    // Sync text controllers with state (when state changes externally).
+    // Sync text controllers when config changes, but only for fields that
+    // are NOT currently in-progress (otherwise we'd overwrite what the user
+    // just typed when the in-progress flag flips on).
     ref.listen<DeviceConfigState>(deviceConfigProvider, (_, next) {
-      _syncFromState();
+      _syncFromState(excludeInProgress: next.inProgress);
     });
 
     if (_disconnected && !_fetching) {

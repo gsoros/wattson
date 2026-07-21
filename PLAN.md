@@ -233,13 +233,47 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
   + bicycle-wheel ellipses) rendered to all Android (`mipmap-*`, `playstore`
   512px) and iOS (`AppIcon.appiconset`, 15 sizes) densities via `flutter_launcher_icons`.
 
-## Phase 7 — Device config (Feature 6)
+## Phase 7 — Device config (Feature 6) DONE (2026-07-21)
 
-- Via NUS → existing text API. UI forms for: Wi-Fi STA SSID/password + STA/AP
-  toggle, hostname, battery capacity, BLE on/off. Send command, parse
-  `Api::Reply` `Code`/`data`.
-- Note: some commands (`ble`, `wifi mode`) trigger **device reboot** — handle
-  gracefully (auto-reconnect).
+### New files
+
+| File | Purpose |
+|------|---------|
+| `lib/ble/nus_protocol.dart` | Central protocol constants (`NusCommands`), `NusReplyCode`/`NusReply` with parser, `DeviceConfig`/`DeviceConfigField` models |
+| `lib/ble/nus_command_queue.dart` | Serialized NUS command queue with dedup, retry (3×, 5s timeout), 100ms inter-command delay, NUS TX reassembly |
+| `lib/providers/device_config_provider.dart` | `DeviceConfigNotifier` (Riverpod `Notifier`), `DeviceConfigState` (config + inProgress + errors), `deviceConfigProvider` |
+| `lib/ui/device_settings_dialog.dart` | Full-screen dialog with form fields for hostname, WiFi SSID/password, battery capacity, BLE/STA/AP/Simulator toggles; reboot warning dialog; disconnect handling |
+| `open-ride-dash/docs/protocol.md` | Authoritative NUS text API protocol spec (command format, reply format, all commands, fragmentation, CTS telemetry) |
+
+### Modified files
+
+| File | Change |
+|------|--------|
+| `lib/ble/ble_service.dart` | `sendCommand()` return type: `Future<String?>` → `Future<NusReply?>` |
+| `lib/ble/real_ble_service.dart` | Replaced raw NUS reassembly with `NusCommandQueue`; `sendCommand()` delegates to queue |
+| `lib/ble/mock_ble_service.dart` | `sendCommand()` returns `NusReply` objects; realistic mock responses; `simAvailable` flag |
+| `lib/ui/settings_page.dart` | Gear icon on connected CC device tile → opens `DeviceSettingsDialog` |
+
+### Architecture
+
+- **NUS command queue**: serialized, dedup by command string, 3 retries with 5s timeout, 100ms inter-command delay.
+- **Reply parser**: `NusReply.parse()` decodes `API [<cmd> <args>] (<code>) <data>` wire format.
+- **Device config state**: `DeviceConfigNotifier` batches all fetch commands into a single state update to avoid per-command widget rebuilds.
+- **UTF-8**: `utf8.encode()`/`utf8.decode()` used throughout — non-ASCII characters and emoji round-trip correctly.
+- **Reboot handling**: `ble on|off|toggle`, `wifi on|off|toggle`, `wifi ap on|off|toggle` show a confirmation dialog before sending; the existing `AutoConnectManager` handles reconnection.
+- **Simulator**: probed on dial-open; toggle hidden if `FEATURE_SIM` is not compiled on the connected device.
+- **Disconnect**: all form fields disabled and a banner shown when the Dash disconnects while the dialog is open.
+
+### Protocol spec
+
+`open-ride-dash/docs/protocol.md` is the authoritative reference covering:
+- NUS transport (fragmentation with 2-byte BE length prefix)
+- Command format (`<cmd>[ <args>]`)
+- Reply format (`API [<cmd> <args>] (<code>) <data>`)
+- All 13 commands with exact reply formats
+- Boolean representation (`on`/`off` from `Util::boolToString()`)
+- CTS telemetry payload (14-byte LE, version 0x01)
+- CTS HR write characteristic
 
 ## Phase 8 — Permissions & platform
 
@@ -268,11 +302,12 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 | M6 | Export (GPX + share_plus; CSV deferred) | **GPX DONE** |
 | M6b | Ride details, map, and graphs (flutter_map, OpenCycleMap/OSM) | **DONE** |
 | M6c | Navigation + UX polish: pure Navigator (drop PageView), swipe gestures, full-screen mode, REC indicator, custom launcher icon, bundle id `org.gsoros.wattson` | **DONE (2026-07-20)** |
-| M7 | Device config (Wi-Fi, hostname, etc. via NUS) | |
+| M7 | Device config (Wi-Fi, hostname, etc. via NUS) | **DONE (2026-07-21)** |
 | M8 | Permissions, iOS pass, tests, polish |
 
-**Firmware dependencies:** M1 needs NUS only for config (M6); M2's push-to-Dash
-needs the HR write char. Both firmware tasks are DONE.
+**Firmware dependencies:** M1 needs NUS only for config (M7); M2's push-to-Dash
+needs the HR write char. Both firmware tasks are DONE. Protocol spec written as
+`docs/protocol.md` in the ORD source tree.
 
 ## Known issues / TODO
 
@@ -282,3 +317,26 @@ needs the HR write char. Both firmware tasks are DONE.
   null/edge case when telemetry drops out (e.g. `Telemetry.ordValid` false, GPS
   fix lost, or a reconnect race) while recording is active. Add crash reporting
   / capture logs before attempting to reproduce.
+
+## Lessons learned
+
+- **Batch state updates to avoid skipped frames:** `fetchAll()` originally updated
+  Riverpod state after each individual command, triggering ~9 rapid widget rebuilds
+  (49 skipped frames). Fixed by collecting all replies first, then applying a
+  single state update.
+- **Capture new values in closures, not from stale config:** `_updateHostname`
+  originally read `config.hostname` (old value) instead of the new value from
+  the closure scope. Setter closures must capture the new value: `(cfg) =>
+  cfg.copyWith(hostname: value)`.
+- **UTF-8 throughout:** `String.codeUnits` is UTF-16, not UTF-8. Use
+  `dart:convert` `utf8.encode()`/`utf8.decode()` for BLE communication.
+- **Sync text controllers with exclude-in-progress:** `_syncFromState()` must
+  skip fields that currently have a command in flight, otherwise the listener
+  fires on the `inProgress` state change and overwrites the user's text with
+  the old value.
+- **Protocol spec in the firmware tree:** `docs/protocol.md` in the ORD source
+  serves as the single source of truth for the API contract, preventing
+  drift between app and firmware.
+- **Riverpod `Notifier` doesn't have `ref.notifyListeners()`:** To trigger
+  rebuilds for in-progress/error state, include it in the state model itself
+  (`DeviceConfigState` wraps config + inProgress + errors).

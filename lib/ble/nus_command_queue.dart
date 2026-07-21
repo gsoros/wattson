@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
@@ -119,7 +120,7 @@ class NusCommandQueue {
     }
 
     if (_buffer.length >= _expectedLen!) {
-      final raw = String.fromCharCodes(_buffer.take(_expectedLen!));
+      final raw = utf8.decode(_buffer.take(_expectedLen!).toList(), allowMalformed: true);
       _buffer.clear();
       _expectedLen = null;
 
@@ -186,7 +187,7 @@ class NusCommandQueue {
     _log.d('send: "${entry.command}"');
 
     try {
-      await rx.write(entry.command.codeUnits, withoutResponse: false);
+      await rx.write(utf8.encode(entry.command), withoutResponse: false);
     } catch (e) {
       _log.e('write failed: $e', error: e);
       _retryOrFail();

@@ -56,25 +56,84 @@ class DeviceConfigNotifier extends Notifier<DeviceConfigState> {
   ///
   /// Sends commands sequentially and updates state as each reply arrives.
   /// Fields that fail remain `null` and an error is recorded.
+  /// Fetch all config values from the connected Dash.
+  ///
+  /// Batches all commands into a single state update to avoid per-command
+  /// widget rebuilds (which cause skipped frames).
   Future<void> fetchAll() async {
     final service = _getService();
     if (service == null) return;
 
-    state = state.copyWith(errors: {});
+    // Mark all fields in-progress with a single state update.
+    state = state.copyWith(
+      inProgress: {DeviceConfigField.hostname, DeviceConfigField.batteryCapacity, DeviceConfigField.bleEnabled, DeviceConfigField.wifiSsid},
+      errors: {},
+    );
 
-    await _fetch(service, DeviceConfigField.hostname, NusCommands.hostname, _parseHostname);
-    await _fetch(service, DeviceConfigField.batteryCapacity, NusCommands.battery, _parseBattery);
-    await _fetch(service, DeviceConfigField.bleEnabled, NusCommands.ble, _parseBle);
-
-    // WiFi summary (includes ssid, password, sta, ap).
-    await _fetch(service, DeviceConfigField.wifiSsid, NusCommands.wifi, _parseWifiSummary);
-
-    // Probe sim command.
+    // Collect all replies first without updating state.
+    final replies = <DeviceConfigField, NusReply?>{};
+    replies[DeviceConfigField.hostname] = await _send(service, NusCommands.hostname);
+    replies[DeviceConfigField.batteryCapacity] = await _send(service, NusCommands.battery);
+    replies[DeviceConfigField.bleEnabled] = await _send(service, NusCommands.ble);
+    replies[DeviceConfigField.wifiSsid] = await _send(service, NusCommands.wifi);
     final simReply = await _send(service, NusCommands.sim);
+
+    // Apply all results in a single state update.
+    var config = state.config;
+    final errors = <DeviceConfigField, String>{};
+
+    _applyResult(replies[DeviceConfigField.hostname], (data) => config = config.copyWith(hostname: data.trim()), errors, DeviceConfigField.hostname);
+    _applyResult(
+      replies[DeviceConfigField.batteryCapacity],
+      (data) {
+        final wh = int.tryParse(data.trim());
+        if (wh != null) config = config.copyWith(batteryCapacityWh: wh);
+      },
+      errors,
+      DeviceConfigField.batteryCapacity,
+    );
+    _applyResult(
+      replies[DeviceConfigField.bleEnabled],
+      (data) {
+        final enabledMatch = RegExp(r'enabled:\s*(\S+)').firstMatch(data);
+        if (enabledMatch != null) config = config.copyWith(bleEnabled: enabledMatch.group(1) == 'on');
+      },
+      errors,
+      DeviceConfigField.bleEnabled,
+    );
+    _applyResult(
+      replies[DeviceConfigField.wifiSsid],
+      (data) {
+        final staMatch = RegExp(r'sta:\s*(\S+)').firstMatch(data);
+        final apMatch = RegExp(r'ap:\s*(\S+)').firstMatch(data);
+        final ssidMatch = RegExp(r'ssid:\s*(.+?)(?:,\s*password:|$)').firstMatch(data);
+        final pwMatch = RegExp(r'password:\s*(.+?)$').firstMatch(data);
+        config = config.copyWith(
+          staEnabled: staMatch != null ? staMatch.group(1) == 'on' : null,
+          apEnabled: apMatch != null ? apMatch.group(1) == 'on' : null,
+          wifiSsid: ssidMatch?.group(1)?.trim(),
+          wifiPassword: pwMatch?.group(1)?.trim(),
+        );
+      },
+      errors,
+      DeviceConfigField.wifiSsid,
+    );
+
     if (simReply != null && simReply.isSuccess) {
-      state = state.copyWith(config: state.config.copyWith(simAvailable: true, simEnabled: _parseSimEnabled(simReply.data)));
+      config = config.copyWith(simAvailable: true, simEnabled: _parseSimEnabled(simReply.data));
     } else {
-      state = state.copyWith(config: state.config.copyWith(simAvailable: false, simEnabled: null));
+      config = config.copyWith(simAvailable: false, simEnabled: null);
+    }
+
+    state = DeviceConfigState(config: config, inProgress: {}, errors: errors);
+  }
+
+  /// Apply a single fetch result: run [apply] on success, record error on failure.
+  void _applyResult(NusReply? reply, void Function(String data) apply, Map<DeviceConfigField, String> errors, DeviceConfigField field) {
+    if (reply != null && reply.isSuccess) {
+      apply(reply.data);
+    } else {
+      errors[field] = reply?.data ?? 'Failed to fetch';
     }
   }
 
@@ -82,24 +141,57 @@ class DeviceConfigNotifier extends Notifier<DeviceConfigState> {
   // Setters
   // ---------------------------------------------------------------------------
 
+  BleService? _getService() {
+    try {
+      return ref.read(bleServiceProvider);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<NusReply?> _send(BleService service, String command) async {
+    try {
+      return await service.sendCommand(command);
+    } catch (e) {
+      _log.e('send error: $e', error: e);
+      return null;
+    }
+  }
+
+  /// Set a value and update state optimistically.
+  Future<void> _setAndFetch(DeviceConfigField field, String command, DeviceConfig Function(DeviceConfig config) updater) async {
+    final service = _getService();
+    if (service == null) return;
+
+    state = state.copyWith(inProgress: {...state.inProgress, field});
+    final reply = await _send(service, command);
+    if (reply != null && reply.isSuccess) {
+      final newConfig = updater(state.config);
+      final newErrors = Map<DeviceConfigField, String>.from(state.errors)..remove(field);
+      state = state.copyWith(config: newConfig, inProgress: {...state.inProgress}..remove(field), errors: newErrors);
+    } else {
+      state = state.copyWith(inProgress: {...state.inProgress}..remove(field), errors: {...state.errors, field: reply?.data ?? 'Command failed'});
+    }
+  }
+
   /// Set the hostname.
   Future<void> setHostname(String value) async {
-    await _setAndFetch(DeviceConfigField.hostname, '${NusCommands.hostname} $value', _updateHostname);
+    await _setAndFetch(DeviceConfigField.hostname, '${NusCommands.hostname} $value', (cfg) => cfg.copyWith(hostname: value));
   }
 
   /// Set the battery capacity (Wh).
   Future<void> setBatteryCapacity(int wh) async {
-    await _setAndFetch(DeviceConfigField.batteryCapacity, '${NusCommands.battery} $wh', _updateBattery);
+    await _setAndFetch(DeviceConfigField.batteryCapacity, '${NusCommands.battery} $wh', (cfg) => cfg.copyWith(batteryCapacityWh: wh));
   }
 
   /// Set WiFi STA SSID.
   Future<void> setWifiSsid(String value) async {
-    await _setAndFetch(DeviceConfigField.wifiSsid, '${NusCommands.wifiSsid} $value', _updateWifiSsid);
+    await _setAndFetch(DeviceConfigField.wifiSsid, '${NusCommands.wifiSsid} $value', (cfg) => cfg.copyWith(wifiSsid: value));
   }
 
   /// Set WiFi STA password.
   Future<void> setWifiPassword(String value) async {
-    await _setAndFetch(DeviceConfigField.wifiPassword, '${NusCommands.wifiPassword} $value', _updateWifiPassword);
+    await _setAndFetch(DeviceConfigField.wifiPassword, '${NusCommands.wifiPassword} $value', (cfg) => cfg.copyWith(wifiPassword: value));
   }
 
   /// Enable or disable BLE radio.
@@ -127,108 +219,13 @@ class DeviceConfigNotifier extends Notifier<DeviceConfigState> {
   }
 
   // ---------------------------------------------------------------------------
-  // Internal helpers
-  // ---------------------------------------------------------------------------
-
-  BleService? _getService() {
-    try {
-      return ref.read(bleServiceProvider);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<NusReply?> _send(BleService service, String command) async {
-    try {
-      return await service.sendCommand(command);
-    } catch (e) {
-      _log.e('send error: $e', error: e);
-      return null;
-    }
-  }
-
-  /// Fetch a single field and update state.
-  Future<void> _fetch(BleService service, DeviceConfigField field, String command, void Function(DeviceConfig config, String data) parser) async {
-    state = state.copyWith(inProgress: {...state.inProgress, field});
-    final reply = await _send(service, command);
-    if (reply != null && reply.isSuccess) {
-      parser(state.config, reply.data);
-      final newErrors = Map<DeviceConfigField, String>.from(state.errors)..remove(field);
-      state = state.copyWith(inProgress: {...state.inProgress}..remove(field), errors: newErrors);
-    } else {
-      state = state.copyWith(inProgress: {...state.inProgress}..remove(field), errors: {...state.errors, field: reply?.data ?? 'Failed to fetch'});
-    }
-  }
-
-  /// Set a value and update state optimistically.
-  Future<void> _setAndFetch(DeviceConfigField field, String command, DeviceConfig Function(DeviceConfig config) updater) async {
-    final service = _getService();
-    if (service == null) return;
-
-    state = state.copyWith(inProgress: {...state.inProgress, field});
-    final reply = await _send(service, command);
-    if (reply != null && reply.isSuccess) {
-      final newConfig = updater(state.config);
-      final newErrors = Map<DeviceConfigField, String>.from(state.errors)..remove(field);
-      state = state.copyWith(config: newConfig, inProgress: {...state.inProgress}..remove(field), errors: newErrors);
-    } else {
-      state = state.copyWith(inProgress: {...state.inProgress}..remove(field), errors: {...state.errors, field: reply?.data ?? 'Command failed'});
-    }
-  }
-
-  // ---------------------------------------------------------------------------
   // Parsers / updaters
   // ---------------------------------------------------------------------------
-
-  void _parseHostname(DeviceConfig config, String data) {
-    state = state.copyWith(config: config.copyWith(hostname: data.trim()));
-  }
-
-  DeviceConfig _updateHostname(DeviceConfig config) => config.copyWith(hostname: config.hostname);
-
-  void _parseBattery(DeviceConfig config, String data) {
-    final trimmed = data.trim();
-    final wh = int.tryParse(trimmed);
-    if (wh != null) {
-      state = state.copyWith(config: config.copyWith(batteryCapacityWh: wh));
-    }
-  }
-
-  DeviceConfig _updateBattery(DeviceConfig config) => config.copyWith(batteryCapacityWh: config.batteryCapacityWh);
-
-  void _parseBle(DeviceConfig config, String data) {
-    // "enabled: on, connected: true"
-    final enabledMatch = RegExp(r'enabled:\s*(\S+)').firstMatch(data);
-    if (enabledMatch != null) {
-      state = state.copyWith(config: config.copyWith(bleEnabled: enabledMatch.group(1) == 'on'));
-    }
-  }
-
-  void _parseWifiSummary(DeviceConfig config, String data) {
-    // "sta: on, ap: off, ssid: MyWiFi, password: secret"
-    final staMatch = RegExp(r'sta:\s*(\S+)').firstMatch(data);
-    final apMatch = RegExp(r'ap:\s*(\S+)').firstMatch(data);
-    final ssidMatch = RegExp(r'ssid:\s*(.+?)(?:,\s*password:|$)').firstMatch(data);
-    final pwMatch = RegExp(r'password:\s*(.+?)$').firstMatch(data);
-
-    state = state.copyWith(
-      config: config.copyWith(
-        staEnabled: staMatch != null ? staMatch.group(1) == 'on' : null,
-        apEnabled: apMatch != null ? apMatch.group(1) == 'on' : null,
-        wifiSsid: ssidMatch?.group(1)?.trim(),
-        wifiPassword: pwMatch?.group(1)?.trim(),
-      ),
-    );
-  }
 
   bool _parseSimEnabled(String data) {
     // "sim on" or "sim off"
     return data.trim() == 'sim on';
   }
-
-  DeviceConfig _updateWifiSsid(DeviceConfig config) => config.copyWith(wifiSsid: config.wifiSsid);
-
-  DeviceConfig _updateWifiPassword(DeviceConfig config) => config.copyWith(wifiPassword: config.wifiPassword);
 }
 
 /// Provider for the device config state (config + in-progress + errors).
