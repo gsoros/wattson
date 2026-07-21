@@ -126,7 +126,7 @@ enum DeviceConfigField { hostname, wifiSsid, wifiPassword, staEnabled, apEnabled
 /// Local state for the connected ORD Dash.
 ///
 /// All values are nullable — `null` means "unknown" (not yet fetched or
-/// unavailable).
+/// unavailable) .
 class DeviceConfig {
   const DeviceConfig({
     this.hostname,
@@ -165,7 +165,7 @@ class DeviceConfig {
   final int? batteryCapacityWh;
 
   /// Whether the `sim` command is available on this firmware build.
-  final bool simAvailable;
+  final bool? simAvailable;
 
   DeviceConfig copyWith({
     String? hostname,

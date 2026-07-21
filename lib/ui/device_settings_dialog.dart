@@ -255,7 +255,7 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
               SizedBox(height: 16),
               Text('Device disconnected', style: TextStyle(fontSize: 18)),
               SizedBox(height: 8),
-              Text('All settings are unavailable while disconnected.'),
+              Text('Settings are unavailable while disconnected.'),
             ],
           ),
         ),
@@ -365,7 +365,8 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
                     error: errors[DeviceConfigField.apEnabled],
                     onChanged: (on) => _toggleAp(on),
                   ),
-                  if (config.simAvailable)
+                  // Only show the simulator toggle if we know that the firmware supports it.
+                  if (config.simAvailable ?? false)
                     _buildSwitchTile(
                       label: 'Simulator',
                       subtitle: 'Simulates e-bike activity',

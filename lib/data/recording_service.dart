@@ -211,14 +211,8 @@ class RecordingService {
   }
 
   /// Computes summary statistics from a ride's telemetry samples.
-  ///
-  /// Averages are taken over **moving** samples only (speed above
-  /// [_motionThreshold]); stationary samples read ~0 for human/motor power and
-  /// cadence and would otherwise dilute the mean. This matches how distance and
-  /// time-in-motion are already computed. [assistRatio] is the mean
-  /// human/motor power ratio over moving samples; it is null when no motor
-  /// power was recorded. Returns [Value]s so the result can be dropped straight
-  /// into a [RidesCompanion] (null when there are no moving samples).
+  /// Returns [Value]s so the result can be dropped straight into a
+  /// [RidesCompanion] (null when there are no moving samples).
   _RideStats _computeRideStats(List<Sample> samples) {
     if (samples.isEmpty) {
       return const _RideStats(
@@ -236,31 +230,43 @@ class RecordingService {
     double totalMotor = 0;
     double totalCadence = 0;
     double totalHr = 0;
-    int hrCount = 0;
-    double totalRatio = 0;
-    int ratioCount = 0;
+
     int movingCount = 0;
+    int validHrCount = 0;
+
+    // Track point-by-point assist ratios to get a true mathematical mean
+    double totalAssistRatioShare = 0;
+    int assistRatioCount = 0;
 
     for (final s in samples) {
-      // Skip stationary samples so their ~0 power/cadence don't dilute the
-      // averages (distance and time-in-motion already use this rule).
+      // 1. Enforce motion threshold across the board
       if (s.speedKmh <= _motionThreshold) continue;
       movingCount++;
 
+      // 2. Accumulate values over all moving samples (zeros included)
       totalHuman += s.humanPowerW;
-      if (s.humanPowerW > maxHuman) maxHuman = s.humanPowerW;
       totalMotor += s.motorPowerW;
       totalCadence += s.cadenceRpm;
+
+      if (s.humanPowerW > maxHuman) {
+        maxHuman = s.humanPowerW;
+      }
+
+      // 3. Heart rate is valid unless zero (disconnected HRM)
       if (s.hrBpm > 0) {
         totalHr += s.hrBpm;
-        hrCount++;
+        validHrCount++;
       }
-      if (s.motorPowerW > 0) {
-        totalRatio += s.humanPowerW / s.motorPowerW;
-        ratioCount++;
+
+      // 4. Calculate individual sample assist share to protect math logic
+      final double combinedPower = s.motorPowerW + s.humanPowerW;
+      if (combinedPower > 0) {
+        totalAssistRatioShare += (s.motorPowerW / combinedPower);
+        assistRatioCount++;
       }
     }
 
+    // Handle case where samples exist but none passed the motion threshold
     if (movingCount == 0) {
       return const _RideStats(
         avgHumanPowerW: Value(null),
@@ -272,13 +278,14 @@ class RecordingService {
       );
     }
 
+    // 5. Divide safely using standard drift-free denominators
     return _RideStats(
       avgHumanPowerW: Value(totalHuman / movingCount),
       maxHumanPowerW: Value(maxHuman),
       avgMotorPowerW: Value(totalMotor / movingCount),
       avgCadenceRpm: Value(totalCadence / movingCount),
-      avgHrBpm: Value(hrCount > 0 ? totalHr / hrCount : null),
-      assistRatio: Value(ratioCount > 0 ? totalRatio / ratioCount : null),
+      avgHrBpm: Value(validHrCount > 0 ? totalHr / validHrCount : null),
+      assistRatio: Value(assistRatioCount > 0 ? totalAssistRatioShare / assistRatioCount : null),
     );
   }
 

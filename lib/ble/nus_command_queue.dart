@@ -126,7 +126,7 @@ class NusCommandQueue {
 
       final reply = NusReply.parse(raw);
       if (reply != null) {
-        _log.d('onNusTxData: ${reply.code} — ${reply.data}');
+        _log.d('onNusTxData: ${reply.command} — ${reply.code} — ${reply.data}');
         if (reply.isSuccess) {
           _completeActive(reply);
         } else {

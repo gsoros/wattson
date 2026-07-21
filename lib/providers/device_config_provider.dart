@@ -54,10 +54,6 @@ class DeviceConfigNotifier extends Notifier<DeviceConfigState> {
 
   /// Fetch all config values from the connected Dash.
   ///
-  /// Sends commands sequentially and updates state as each reply arrives.
-  /// Fields that fail remain `null` and an error is recorded.
-  /// Fetch all config values from the connected Dash.
-  ///
   /// Batches all commands into a single state update to avoid per-command
   /// widget rebuilds (which cause skipped frames).
   Future<void> fetchAll() async {
