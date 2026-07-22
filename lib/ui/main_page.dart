@@ -241,13 +241,13 @@ class _RecordingControlBar extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Hold-to-confirm button (progress ring)
+// Hold-to-confirm button
 // ---------------------------------------------------------------------------
 //
 // Used for destructive / easy-to-miss actions (pause, stop, resume) so they
-// can't be triggered by an accidental tap. The user must press and hold; a
-// circular indicator fills over ~600 ms and the action only fires once the
-// ring completes. Releasing early cancels.
+// can't be triggered by an accidental tap. The user must press and hold; an
+// indicator fills over ~2.5 s and the action only fires once the indicator
+// completes. Releasing early cancels.
 
 class _HoldToConfirmButton extends StatefulWidget {
   const _HoldToConfirmButton({required this.icon, required this.backgroundColor, required this.onConfirmed, this.iconColor = Colors.white, this.tooltip});

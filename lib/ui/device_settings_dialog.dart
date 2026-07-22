@@ -249,7 +249,8 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
       _syncFromState(excludeInProgress: next.inProgress);
     });
 
-    if (_disconnected && !_fetching) {
+    if (false && _disconnected && !_fetching) {
+      // DISABLED for testing
       // Show a disconnected state.
       return Scaffold(
         appBar: AppBar(title: const Text('Device Settings')),
@@ -276,135 +277,141 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
             const Padding(
               padding: EdgeInsets.only(right: 16),
               child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Reload',
+              onPressed: () {
+                _fetchAll();
+              },
             ),
         ],
       ),
-      body: _fetching
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // -- Hostname --
-                  _buildTextField(
-                    label: 'Hostname',
-                    controller: _hostnameCtrl,
-                    focusNode: _hostnameFocus,
-                    inProgress: inProgress.contains(DeviceConfigField.hostname),
-                    error: errors[DeviceConfigField.hostname],
-                    isDirty: _dirty[DeviceConfigField.hostname] == true,
-                    onSubmit: _submitHostname,
-                    unknown: config.hostname == null,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // -- WiFi STA SSID --
-                  _buildTextField(
-                    label: 'WiFi STA SSID',
-                    controller: _wifiSsidCtrl,
-                    focusNode: _wifiSsidFocus,
-                    inProgress: inProgress.contains(DeviceConfigField.wifiSsid),
-                    error: errors[DeviceConfigField.wifiSsid],
-                    isDirty: _dirty[DeviceConfigField.wifiSsid] == true,
-                    onSubmit: _submitWifiSsid,
-                    unknown: config.wifiSsid == null,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // -- WiFi STA Password --
-                  _buildTextField(
-                    label: 'WiFi STA Password',
-                    controller: _wifiPasswordCtrl,
-                    focusNode: _wifiPasswordFocus,
-                    inProgress: inProgress.contains(DeviceConfigField.wifiPassword),
-                    error: errors[DeviceConfigField.wifiPassword],
-                    isDirty: _dirty[DeviceConfigField.wifiPassword] == true,
-                    onSubmit: _submitWifiPassword,
-                    obscureText: true,
-                    unknown: config.wifiPassword == null,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // -- Battery capacity --
-                  _buildTextField(
-                    label: 'Battery Capacity (Wh)',
-                    controller: _batteryCtrl,
-                    focusNode: _batteryFocus,
-                    inProgress: inProgress.contains(DeviceConfigField.batteryCapacity),
-                    error: errors[DeviceConfigField.batteryCapacity],
-                    isDirty: _dirty[DeviceConfigField.batteryCapacity] == true,
-                    onSubmit: _submitBattery,
-                    keyboardType: TextInputType.number,
-                    unknown: config.batteryCapacityWh == null,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // -- Toggles --
-                  Text('Toggles', style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                  const SizedBox(height: 8),
-
-                  _buildSwitchTile(
-                    label: 'BLE',
-                    subtitle: 'Reboots the device on change',
-                    value: config.bleEnabled ?? false,
-                    unknown: config.bleEnabled == null,
-                    inProgress: inProgress.contains(DeviceConfigField.bleEnabled),
-                    error: errors[DeviceConfigField.bleEnabled],
-                    onChanged: (on) => _toggleBle(on),
-                  ),
-                  _buildSwitchTile(
-                    label: 'WiFi STA',
-                    subtitle: 'Reboots the device on change',
-                    value: config.staEnabled ?? false,
-                    unknown: config.staEnabled == null,
-                    inProgress: inProgress.contains(DeviceConfigField.staEnabled),
-                    error: errors[DeviceConfigField.staEnabled],
-                    onChanged: (on) => _toggleSta(on),
-                  ),
-                  _buildSwitchTile(
-                    label: 'WiFi AP',
-                    subtitle: 'Reboots the device on change',
-                    value: config.apEnabled ?? false,
-                    unknown: config.apEnabled == null,
-                    inProgress: inProgress.contains(DeviceConfigField.apEnabled),
-                    error: errors[DeviceConfigField.apEnabled],
-                    onChanged: (on) => _toggleAp(on),
-                  ),
-                  // Only show the simulator toggle if we know that the firmware supports it.
-                  if (config.simAvailable ?? false)
-                    _buildSwitchTile(
-                      label: 'Simulator',
-                      subtitle: 'Simulates e-bike activity',
-                      value: config.simEnabled ?? false,
-                      unknown: config.simEnabled == null,
-                      inProgress: inProgress.contains(DeviceConfigField.simEnabled),
-                      error: errors[DeviceConfigField.simEnabled],
-                      onChanged: (on) => _toggleSim(on),
-                    ),
-
-                  const SizedBox(height: 32),
-
-                  // -- Disconnected banner --
-                  if (_disconnected)
-                    Card(
-                      color: theme.colorScheme.errorContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            Icon(Icons.link_off, color: theme.colorScheme.onErrorContainer),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text('Device disconnected. Settings are unavailable.', style: TextStyle(color: theme.colorScheme.onErrorContainer)),
-                            ),
-                          ],
-                        ),
+      body:
+          // _fetching ? const Center(child: CircularProgressIndicator()) :
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // -- Disconnected banner --
+                if (_disconnected)
+                  Card(
+                    color: theme.colorScheme.errorContainer.withAlpha(192),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.link_off, color: theme.colorScheme.onErrorContainer),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text('Device disconnected. Settings are unavailable.', style: TextStyle(color: theme.colorScheme.onErrorContainer)),
+                          ),
+                        ],
                       ),
                     ),
-                ],
-              ),
+                  ),
+
+                // -- Hostname --
+                _buildTextField(
+                  label: 'Hostname',
+                  controller: _hostnameCtrl,
+                  focusNode: _hostnameFocus,
+                  inProgress: inProgress.contains(DeviceConfigField.hostname),
+                  error: errors[DeviceConfigField.hostname],
+                  isDirty: _dirty[DeviceConfigField.hostname] == true,
+                  onSubmit: _submitHostname,
+                  unknown: config.hostname == null,
+                ),
+                const SizedBox(height: 16),
+
+                // -- WiFi STA SSID --
+                _buildTextField(
+                  label: 'WiFi STA SSID',
+                  controller: _wifiSsidCtrl,
+                  focusNode: _wifiSsidFocus,
+                  inProgress: inProgress.contains(DeviceConfigField.wifiSsid),
+                  error: errors[DeviceConfigField.wifiSsid],
+                  isDirty: _dirty[DeviceConfigField.wifiSsid] == true,
+                  onSubmit: _submitWifiSsid,
+                  unknown: config.wifiSsid == null,
+                ),
+                const SizedBox(height: 16),
+
+                // -- WiFi STA Password --
+                _buildTextField(
+                  label: 'WiFi STA Password',
+                  controller: _wifiPasswordCtrl,
+                  focusNode: _wifiPasswordFocus,
+                  inProgress: inProgress.contains(DeviceConfigField.wifiPassword),
+                  error: errors[DeviceConfigField.wifiPassword],
+                  isDirty: _dirty[DeviceConfigField.wifiPassword] == true,
+                  onSubmit: _submitWifiPassword,
+                  obscureText: true,
+                  unknown: config.wifiPassword == null,
+                ),
+                const SizedBox(height: 16),
+
+                // -- Battery capacity --
+                _buildTextField(
+                  label: 'Battery Capacity (Wh)',
+                  controller: _batteryCtrl,
+                  focusNode: _batteryFocus,
+                  inProgress: inProgress.contains(DeviceConfigField.batteryCapacity),
+                  error: errors[DeviceConfigField.batteryCapacity],
+                  isDirty: _dirty[DeviceConfigField.batteryCapacity] == true,
+                  onSubmit: _submitBattery,
+                  keyboardType: TextInputType.number,
+                  unknown: config.batteryCapacityWh == null,
+                ),
+                const SizedBox(height: 24),
+
+                // -- Toggles --
+                Text('Toggles', style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 8),
+
+                _buildSwitchTile(
+                  label: 'BLE',
+                  subtitle: 'Reboots the device on change',
+                  value: config.bleEnabled ?? false,
+                  unknown: config.bleEnabled == null,
+                  inProgress: inProgress.contains(DeviceConfigField.bleEnabled),
+                  error: errors[DeviceConfigField.bleEnabled],
+                  onChanged: (on) => _toggleBle(on),
+                ),
+                _buildSwitchTile(
+                  label: 'WiFi STA',
+                  subtitle: 'Reboots the device on change',
+                  value: config.staEnabled ?? false,
+                  unknown: config.staEnabled == null,
+                  inProgress: inProgress.contains(DeviceConfigField.staEnabled),
+                  error: errors[DeviceConfigField.staEnabled],
+                  onChanged: (on) => _toggleSta(on),
+                ),
+                _buildSwitchTile(
+                  label: 'WiFi AP',
+                  subtitle: 'Reboots the device on change',
+                  value: config.apEnabled ?? false,
+                  unknown: config.apEnabled == null,
+                  inProgress: inProgress.contains(DeviceConfigField.apEnabled),
+                  error: errors[DeviceConfigField.apEnabled],
+                  onChanged: (on) => _toggleAp(on),
+                ),
+                // Only show the simulator toggle if we know that the firmware supports it.
+                if (config.simAvailable ?? false)
+                  _buildSwitchTile(
+                    label: 'Simulator',
+                    subtitle: 'Simulates e-bike activity',
+                    value: config.simEnabled ?? false,
+                    unknown: config.simEnabled == null,
+                    inProgress: inProgress.contains(DeviceConfigField.simEnabled),
+                    error: errors[DeviceConfigField.simEnabled],
+                    onChanged: (on) => _toggleSim(on),
+                  ),
+              ],
             ),
+          ),
     );
   }
 

@@ -7,7 +7,8 @@ import '../providers/ble_provider.dart';
 import '../util/app_log.dart';
 import 'device_settings_dialog.dart';
 
-/// Settings page showing BLE scan results with connect/disconnect controls.
+/// Settings page.
+/// For now the only setting is the device list: BLE scan results with connect/disconnect controls.
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -37,7 +38,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('BLE Devices'),
+        title: const Text('BLE Devices'), // We can rename this to "Settings" when we add more settings.
         actions: [
           IconButton(icon: const Icon(Icons.bug_report), tooltip: 'Share diagnostic log', onPressed: () => AppLog.share()),
           IconButton(
@@ -81,9 +82,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 return ListView.separated(
                   padding: const EdgeInsets.all(8),
                   itemCount: sorted.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
-                    return _DeviceTile(device: sorted[index]);
+                    return _DeviceCard(device: sorted[index]);
                   },
                 );
               },
@@ -97,8 +98,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 }
 
-class _DeviceTile extends ConsumerWidget {
-  const _DeviceTile({required this.device});
+class _DeviceCard extends ConsumerWidget {
+  const _DeviceCard({required this.device});
   final BleScanResult device;
 
   /// Module logger (auto-captures caller class + file:line).
@@ -134,60 +135,72 @@ class _DeviceTile extends ConsumerWidget {
       iconColor = Colors.grey;
     }
 
-    final tile = ListTile(
-      leading: Icon(icon, color: iconColor, size: 36),
-      title: Text(device.name.isNotEmpty ? device.name : '(Unknown)'),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final card = Card(
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        spacing: 8.0,
         children: [
-          Text(device.deviceId, style: theme.textTheme.bodySmall),
-          if (device.rssi != null) Text('RSSI: ${device.rssi} dBm', style: theme.textTheme.bodySmall),
-          if (!device.inRange && !isConnected) Text('Out of range — swipe to forget', style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange)),
-        ],
-      ),
-      trailing: isConnected
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isCyclingComputer)
-                  IconButton(
-                    icon: const Icon(Icons.settings),
-                    tooltip: 'Device Settings',
-                    onPressed: () {
-                      showDialog(context: context, builder: (_) => const DeviceSettingsDialog());
-                    },
-                  ),
-                OutlinedButton(
+          Icon(icon, color: iconColor, size: 36),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 16.0),
+              Text(device.name.isNotEmpty ? device.name : '(Unknown)', style: theme.textTheme.titleMedium),
+              SizedBox(height: 16.0),
+              Text(device.deviceId, style: theme.textTheme.bodySmall),
+              if (device.rssi != null) Text('RSSI: ${device.rssi} dBm', style: theme.textTheme.bodySmall),
+              Text(
+                (!device.inRange && !isConnected) ? 'Out of range — swipe to forget' : ' ',
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
+              ),
+            ],
+          ),
+          Expanded(child: SizedBox.shrink()),
+          isConnected
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isCyclingComputer)
+                      IconButton(
+                        icon: const Icon(Icons.settings),
+                        tooltip: 'Device Settings',
+                        onPressed: () {
+                          showDialog(context: context, builder: (_) => const DeviceSettingsDialog());
+                        },
+                      ),
+                    OutlinedButton(
+                      onPressed: () {
+                        if (isCyclingComputer) {
+                          service.disconnectDash();
+                        } else if (isHrm) {
+                          service.disconnectHrm();
+                        } else {
+                          _log.w('Disconnect button: Unknown device type: $device');
+                          // We are connected to an unknown device type, so forget it.
+                          service.forgetDevice(device.deviceId);
+                        }
+                        service.stopScan();
+                        service.startScan();
+                      },
+                      style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                      child: const Text('Disconnect'),
+                    ),
+                  ],
+                )
+              : canConnect
+              ? FilledButton(
                   onPressed: () {
                     if (isCyclingComputer) {
-                      service.disconnectDash();
-                    } else if (isHrm) {
-                      service.disconnectHrm();
+                      service.connectToDash(device.deviceId, name: device.name);
                     } else {
-                      _log.w('Disconnect button: Unknown device type: $device');
-                      // We are connected to an unknown device type, so forget it.
-                      service.forgetDevice(device.deviceId);
+                      service.connectToHrm(device.deviceId, name: device.name);
                     }
-                    service.stopScan();
-                    service.startScan();
                   },
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                  child: const Text('Disconnect'),
-                ),
-              ],
-            )
-          : canConnect
-          ? FilledButton(
-              onPressed: () {
-                if (isCyclingComputer) {
-                  service.connectToDash(device.deviceId, name: device.name);
-                } else {
-                  service.connectToHrm(device.deviceId, name: device.name);
-                }
-              },
-              child: const Text('Connect'),
-            )
-          : null,
+                  child: const Text('Connect'),
+                )
+              : SizedBox.shrink(),
+        ],
+      ),
     );
 
     // Wrap out-of-range devices in a Dismissible so the user can swipe to forget.
@@ -206,10 +219,10 @@ class _DeviceTile extends ConsumerWidget {
           _log.d('Dismiss: Forgetting device: $device');
           service.forgetDevice(device.deviceId);
         },
-        child: tile,
+        child: card,
       );
     }
 
-    return tile;
+    return card;
   }
 }
