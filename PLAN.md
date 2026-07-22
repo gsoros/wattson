@@ -315,8 +315,9 @@ needs the HR write char. Both firmware tasks are DONE. Protocol spec written as
   crashed once while **stopped with the ORD Dash out of BLE range**. Cause
   unknown — no stack trace captured. Need to reproduce and investigate: likely a
   null/edge case when telemetry drops out (e.g. `Telemetry.ordValid` false, GPS
-  fix lost, or a reconnect race) while recording is active. Add crash reporting
-  / capture logs before attempting to reproduce.
+  fix lost, or a reconnect race) while recording is active. Added crash reporting. 
+  **UPDATE**: adding try/catch guards around all BLE operations appears to have 
+  fixed the crash.
 
 ## Lessons learned
 

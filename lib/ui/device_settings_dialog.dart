@@ -249,26 +249,6 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
       _syncFromState(excludeInProgress: next.inProgress);
     });
 
-    if (false && _disconnected && !_fetching) {
-      // DISABLED for testing
-      // Show a disconnected state.
-      return Scaffold(
-        appBar: AppBar(title: const Text('Device Settings')),
-        body: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.link_off, size: 64, color: Colors.grey),
-              SizedBox(height: 16),
-              Text('Device disconnected', style: TextStyle(fontSize: 18)),
-              SizedBox(height: 8),
-              Text('Settings are unavailable while disconnected.'),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Device Settings'),
