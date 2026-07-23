@@ -156,15 +156,21 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
   }
 }
 
-// class CircularProgressPainter extends CustomPainter {}
-
 // ---------------------------------------------------------------------------
 // Cyclist painter (stick figure riding across screen)
+// Work-in-progress: not yet used.
 // ---------------------------------------------------------------------------
-
+// ignore: unused_element
 class _CyclistPainter extends CustomPainter {
-  _CyclistPainter({required this.progress, required this.screenWidth, this.startX = -200.0, required this.color});
+  _CyclistPainter({
+    required this.progress,
+    required this.screenWidth,
+    // ignore: unused_element_parameter
+    this.startX = -200.0,
+    required this.color,
+  });
 
+  // ignore: unused_field
   static final _log = AppLog.logFor('_CyclistPainter');
 
   final double progress; // 0.0 → 1.0
