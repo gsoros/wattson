@@ -37,7 +37,7 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
   late final AnimationController _controller;
   final _buttonKey = GlobalKey();
   final _stackKey = GlobalKey();
-  static final _log = AppLog.logFor('_HoldToConfirmButtonState');
+  //static final _log = AppLog.logFor('_HoldToConfirmButtonState');
 
   /// True once a full hold completes, so the trailing tap (which fires after
   /// the finger lifts) doesn't also pop the "press and hold" hint.
@@ -81,8 +81,8 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+    //final screenWidth = MediaQuery.of(context).size.width;
+    //final screenHeight = MediaQuery.of(context).size.height;
 
     return Semantics(
       button: true,

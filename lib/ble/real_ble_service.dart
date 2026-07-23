@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../service/permission_service.dart';
 
 import '../models/telemetry.dart';
 import '../util/app_log.dart';
@@ -119,7 +119,7 @@ class RealBleService implements BleService {
       return;
     }
 
-    if (!await _requestBlePermissions()) {
+    if (!await PermissionService.instance.requestBle()) {
       _log.d('startScan: permissions not granted');
       return;
     }
@@ -590,7 +590,7 @@ class RealBleService implements BleService {
 
   /// Find a previously-seen [BluetoothDevice] by its remote ID string.
   Future<BluetoothDevice?> _findDeviceById(String deviceId) async {
-    if (!await _requestBlePermissions()) return null;
+    if (!await PermissionService.instance.requestBle()) return null;
 
     if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
       try {
@@ -632,23 +632,6 @@ class RealBleService implements BleService {
         await FlutterBluePlus.stopScan();
       } catch (_) {}
     }
-  }
-
-  Future<bool> _requestBlePermissions() async {
-    if (defaultTargetPlatform != TargetPlatform.android) return true;
-
-    final bleResult = await [Permission.bluetoothScan, Permission.bluetoothConnect].request();
-    final bleGranted = bleResult[Permission.bluetoothScan]?.isGranted == true && bleResult[Permission.bluetoothConnect]?.isGranted == true;
-    if (!bleGranted) {
-      _log.w('BLUETOOTH_SCAN/CONNECT not granted');
-      return false;
-    }
-
-    if (await Permission.locationWhenInUse.status.isDenied == true) {
-      await Permission.locationWhenInUse.request();
-    }
-
-    return true;
   }
 
   /// Update the cache entry for a device with known name and appearance.

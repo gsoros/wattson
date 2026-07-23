@@ -4,6 +4,8 @@ import 'package:drift/drift.dart' show Value, OrderingTerm, OrderingMode;
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../service/permission_service.dart';
+
 import '../data/database.dart';
 import '../util/app_log.dart';
 import '../util/ride_title_generator.dart';
@@ -85,7 +87,9 @@ class RecordingService {
   /// If [rideId] is provided (orphan resume), the existing ride row is reused
   /// and no new row is inserted. Otherwise a fresh ride row is created.
   Future<void> start({int? rideId}) async {
-    if (_state.isActive) return;
+    if (_state.isActive) return; // already started
+
+    await PermissionService.instance.requestAllRecording();
 
     _log.d('starting ride #${rideId ?? 'new'}');
 
@@ -401,7 +405,6 @@ class RecordingService {
   // ---------------------------------------------------------------------------
   // GPS
   // ---------------------------------------------------------------------------
-
   void _onGpsPosition(Position pos) {
     _lastLat = pos.latitude;
     _lastLon = pos.longitude;
@@ -415,7 +418,6 @@ class RecordingService {
   // ---------------------------------------------------------------------------
   // Telemetry handler
   // ---------------------------------------------------------------------------
-
   void _onTelemetry(Telemetry t) {
     if (!_state.isRecording || !t.ordValid) return;
 
