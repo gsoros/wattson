@@ -303,7 +303,7 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 | M6b | Ride details, map, and graphs (flutter_map, OpenCycleMap/OSM) | **DONE** |
 | M6c | Navigation + UX polish: pure Navigator (drop PageView), swipe gestures, full-screen mode, REC indicator, custom launcher icon, bundle id `org.gsoros.wattson` | **DONE (2026-07-20)** |
 | M7 | Device config (Wi-Fi, hostname, etc. via NUS) | **DONE (2026-07-21)** |
-| M8 | Permissions, iOS pass, tests, polish |
+| M8 | Permissions **DONE**, iOS pass **DEFERRED**, tests, polish **IN PROGRESS** |
 
 **Firmware dependencies:** M1 needs NUS only for config (M7); M2's push-to-Dash
 needs the HR write char. Both firmware tasks are DONE. Protocol spec written as

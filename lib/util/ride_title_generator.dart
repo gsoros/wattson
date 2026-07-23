@@ -66,11 +66,11 @@ String generateRideTitle(Ride ride) {
   if (climb >= 800 && km >= 12) {
     return '$timeOfDay Climb';
   }
-  if (avgHuman > 0 && avgHuman < 70 && km < 12) {
+  if (avgHuman > 0 && avgHuman < 100 && km < 12) {
     // Low effort, short ride.
     return 'Lazy ${_shortNoun(noun)}';
   }
-  if (maxHuman >= 250) {
+  if (avgHuman >= 230) {
     return 'Superhuman $noun';
   }
 
