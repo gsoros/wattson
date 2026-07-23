@@ -34,14 +34,18 @@ class HoldToConfirmButton extends StatefulWidget {
 }
 
 class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTickerProviderStateMixin {
+  // static final _log = AppLog.logFor('_HoldToConfirmButtonState');
   late final AnimationController _controller;
   final _buttonKey = GlobalKey();
   final _stackKey = GlobalKey();
-  //static final _log = AppLog.logFor('_HoldToConfirmButtonState');
 
   /// True once a full hold completes, so the trailing tap (which fires after
   /// the finger lifts) doesn't also pop the "press and hold" hint.
   bool _confirmed = false;
+
+  /// True if the user released the button after 10% of the animation but before
+  /// the animation completed.
+  bool _seenAndCancelled = false;
 
   @override
   void initState() {
@@ -58,10 +62,14 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
 
   void _start() {
     _confirmed = false;
+    _seenAndCancelled = false;
     _controller.forward();
   }
 
   void _cancel() {
+    // If the user released the button after 10% of the animation, set a flag to
+    // signal that the hint should be skipped.
+    if ((_controller.lastElapsedDuration ?? Duration.zero) > (_controller.duration ?? Duration.zero) * 0.1) _seenAndCancelled = true;
     switch (_controller.status) {
       case AnimationStatus.forward:
         _controller.reverse();
@@ -92,10 +100,10 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
         onTapUp: (_) => _cancel(),
         onTapCancel: () => _cancel(),
         onTap: () {
-          // A quick tap (no hold) shouldn't fire the action — instead hint
-          // the user that a press-and-hold is required. Skip the hint when a
-          // full hold just completed (the action already fired).
-          if (_confirmed) return;
+          // A quick tap (no hold) shouldn't fire the action — instead hint the
+          // user that a press-and-hold is required. Skip the hint when a hold
+          // just completed (the action already fired) or was prematurely cancelled.
+          if (_confirmed || _seenAndCancelled) return;
           final hint = widget.tooltip?.replaceFirst('Hold to', 'Press and hold to');
           if (hint != null) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hint), duration: const Duration(seconds: 1)));
