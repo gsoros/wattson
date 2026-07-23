@@ -84,7 +84,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   itemCount: sorted.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
-                    return _DeviceCard(device: sorted[index]);
+                    return _DeviceCard(key: ValueKey(sorted[index].deviceId), device: sorted[index]);
                   },
                 );
               },
@@ -98,28 +98,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 }
 
-class _DeviceCard extends ConsumerWidget {
-  const _DeviceCard({required this.device});
+class _DeviceCard extends ConsumerStatefulWidget {
+  const _DeviceCard({super.key, required this.device});
   final BleScanResult device;
 
+  @override
+  ConsumerState<_DeviceCard> createState() => _DeviceCardState();
+}
+
+class _DeviceCardState extends ConsumerState<_DeviceCard> {
   /// Module logger (auto-captures caller class + file:line).
   static final _log = AppLog.logFor('SettingsPage');
 
+  /// Local connecting flag — set immediately on press, reset when the
+  /// connection state stream leaves the `connecting` state.
+  bool _isConnecting = false;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final service = ref.read(bleServiceProvider);
     final dashState = ref.watch(dashConnectionStateProvider).value;
     final hrmState = ref.watch(hrmConnectionStateProvider).value;
 
-    final isConnected = device.isConnected;
-    final isCyclingComputer = device.appearance == 0x0480;
-    final isHrm = device.serviceUuids.any((u) => u.startsWith('180d')) || device.appearance == 0x0134;
+    final isConnected = widget.device.isConnected;
+    final isCyclingComputer = widget.device.appearance == 0x0480;
+    final isHrm = widget.device.serviceUuids.any((u) => u.startsWith('180d')) || widget.device.appearance == 0x0134;
+
+    // Reset local state when the connection reaches a terminal state
+    // (connected or disconnected). Don't react to intermediate states like
+    // `scanning` which would immediately undo the local `_isConnecting`.
+    ref.listen(dashConnectionStateProvider, (prev, next) {
+      final state = next.value;
+      if (isCyclingComputer && (state == BleConnectionState.connected || state == BleConnectionState.disconnected)) {
+        setState(() => _isConnecting = false);
+      }
+    });
+    ref.listen(hrmConnectionStateProvider, (prev, next) {
+      final state = next.value;
+      if (isHrm && (state == BleConnectionState.connected || state == BleConnectionState.disconnected)) {
+        setState(() => _isConnecting = false);
+      }
+    });
+
     final dashConnected = dashState == BleConnectionState.connected;
     final hrmConnected = hrmState == BleConnectionState.connected;
 
+    _log.d(
+      'device=${widget.device}, isConnected=$isConnected, _isConnecting=$_isConnecting, '
+      'isCyclingComputer=$isCyclingComputer, isHrm=$isHrm, '
+      'dashConnected=$dashConnected, hrmConnected=$hrmConnected',
+    );
+
     // Slot availability: at most one CC and one HRM.
-    final canConnect = !isConnected && device.inRange && ((isCyclingComputer && !dashConnected) || (isHrm && !hrmConnected) || (!isCyclingComputer && !isHrm));
+    final canConnect =
+        !isConnected &&
+        !_isConnecting &&
+        widget.device.inRange &&
+        ((isCyclingComputer && !dashConnected) || (isHrm && !hrmConnected) || (!isCyclingComputer && !isHrm));
 
     // Icon based on appearance.
     IconData icon;
@@ -144,18 +180,18 @@ class _DeviceCard extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(height: 16.0),
-              Text(device.name.isNotEmpty ? device.name : '(Unknown)', style: theme.textTheme.titleMedium),
-              SizedBox(height: 16.0),
-              Text(device.deviceId, style: theme.textTheme.bodySmall),
-              if (device.rssi != null) Text('RSSI: ${device.rssi} dBm', style: theme.textTheme.bodySmall),
+              const SizedBox(height: 16.0),
+              Text(widget.device.name.isNotEmpty ? widget.device.name : '(Unknown)', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 16.0),
+              Text(widget.device.deviceId, style: theme.textTheme.bodySmall),
+              if (widget.device.rssi != null) Text('RSSI: ${widget.device.rssi} dBm', style: theme.textTheme.bodySmall),
               Text(
-                (!device.inRange && !isConnected) ? 'Out of range — swipe to forget' : ' ',
+                (!widget.device.inRange && !isConnected) ? 'Out of range — swipe to forget' : ' ',
                 style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
               ),
             ],
           ),
-          Expanded(child: SizedBox.shrink()),
+          const Expanded(child: SizedBox.shrink()),
           isConnected
               ? Row(
                   mainAxisSize: MainAxisSize.min,
@@ -175,9 +211,9 @@ class _DeviceCard extends ConsumerWidget {
                         } else if (isHrm) {
                           service.disconnectHrm();
                         } else {
-                          _log.w('Disconnect button: Unknown device type: $device');
+                          _log.w('Disconnect button: Unknown device type: ${widget.device}');
                           // We are connected to an unknown device type, so forget it.
-                          service.forgetDevice(device.deviceId);
+                          service.forgetDevice(widget.device.deviceId);
                         }
                         service.stopScan();
                         service.startScan();
@@ -187,26 +223,32 @@ class _DeviceCard extends ConsumerWidget {
                     ),
                   ],
                 )
+              : _isConnecting
+              ? FilledButton(
+                  onPressed: null, // disabled
+                  child: const Text('Connecting…'),
+                )
               : canConnect
               ? FilledButton(
                   onPressed: () {
+                    setState(() => _isConnecting = true);
                     if (isCyclingComputer) {
-                      service.connectToDash(device.deviceId, name: device.name);
+                      service.connectToDash(widget.device.deviceId, name: widget.device.name);
                     } else {
-                      service.connectToHrm(device.deviceId, name: device.name);
+                      service.connectToHrm(widget.device.deviceId, name: widget.device.name);
                     }
                   },
                   child: const Text('Connect'),
                 )
-              : SizedBox.shrink(),
+              : const SizedBox.shrink(),
         ],
       ),
     );
 
     // Wrap out-of-range devices in a Dismissible so the user can swipe to forget.
-    if (!device.inRange && !isConnected) {
+    if (!widget.device.inRange && !isConnected) {
       return Dismissible(
-        key: ValueKey('forget-${device.deviceId}'),
+        key: ValueKey('forget-${widget.device.deviceId}'),
         direction: DismissDirection.endToStart,
         background: Container(
           alignment: Alignment.centerRight,
@@ -215,9 +257,8 @@ class _DeviceCard extends ConsumerWidget {
           child: const Icon(Icons.delete, color: Colors.white),
         ),
         onDismissed: (_) {
-          // Forget this device: remove from cache and app storage.
-          _log.d('Dismiss: Forgetting device: $device');
-          service.forgetDevice(device.deviceId);
+          _log.d('Dismiss: Forgetting device: ${widget.device}');
+          service.forgetDevice(widget.device.deviceId);
         },
         child: card,
       );

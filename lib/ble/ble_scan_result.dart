@@ -6,6 +6,7 @@ class BleScanResult {
     this.rssi,
     this.appearance = 0,
     this.isConnected = false,
+    this.isConnecting = false,
     this.inRange = true,
     this.lastSeen,
     this.serviceUuids = const [],
@@ -26,6 +27,9 @@ class BleScanResult {
   /// Whether this device is currently connected to one of our slots.
   final bool isConnected;
 
+  /// Whether this device is currently connecting to one of our slots.
+  final bool isConnecting;
+
   /// Whether this device was seen in the most recent scan.
   /// False for stored-but-out-of-range devices.
   final bool inRange;
@@ -42,6 +46,7 @@ class BleScanResult {
     int? rssi,
     int? appearance,
     bool? isConnected,
+    bool? isConnecting,
     bool? inRange,
     DateTime? lastSeen,
     List<String>? serviceUuids,
@@ -52,6 +57,7 @@ class BleScanResult {
       rssi: rssi ?? this.rssi,
       appearance: appearance ?? this.appearance,
       isConnected: isConnected ?? this.isConnected,
+      isConnecting: isConnecting ?? this.isConnecting,
       inRange: inRange ?? this.inRange,
       lastSeen: lastSeen ?? this.lastSeen,
       serviceUuids: serviceUuids ?? this.serviceUuids,

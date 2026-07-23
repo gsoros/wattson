@@ -45,6 +45,9 @@ class RealBleService implements BleService {
   // Merged with fresh scan results before emitting.
   final Map<String, BleScanResult> _knownDevices = {};
 
+  // Devices currently connecting to a slot.
+  final _connectingIds = <String>{};
+
   // -- Dash slot state --
   BluetoothDevice? _dashDevice;
   BluetoothCharacteristic? _ctsTelemetryChar;
@@ -193,6 +196,7 @@ class RealBleService implements BleService {
         rssi: r.rssi,
         appearance: r.advertisementData.appearance ?? 0,
         isConnected: connectedIds.contains(id),
+        isConnecting: _connectingIds.contains(id),
         inRange: true,
         lastSeen: now,
         serviceUuids: r.advertisementData.serviceUuids.map((g) => g.str).toList(),
@@ -241,11 +245,13 @@ class RealBleService implements BleService {
     final device = await _findDeviceById(deviceId);
     if (device == null) {
       _log.d('connectToDash: device $deviceId not found');
+      _connectingIds.remove(deviceId);
       _dashStateController.add(BleConnectionState.disconnected);
       return;
     }
 
     _dashDevice = device;
+    _connectingIds.add(deviceId);
     _dashStateController.add(BleConnectionState.connecting);
     _log.d('connectToDash: found ${device.remoteId}');
 
@@ -260,6 +266,7 @@ class RealBleService implements BleService {
       if (event.device.remoteId == device.remoteId && event.connectionState == BluetoothConnectionState.disconnected) {
         _log.d('Dash disconnected');
         dashConnected = false;
+        _connectingIds.remove(deviceId);
         _dashStateController.add(BleConnectionState.disconnected);
         _onDashDisconnected();
       }
@@ -271,6 +278,7 @@ class RealBleService implements BleService {
       _log.d('Dash connected');
     } catch (e) {
       _log.e('Dash connect failed: $e', error: e);
+      _connectingIds.remove(deviceId);
       _dashStateController.add(BleConnectionState.disconnected);
       return;
     }
@@ -282,6 +290,7 @@ class RealBleService implements BleService {
     } catch (e) {
       _log.e('Dash discoverServices failed: $e', error: e);
       await device.disconnect();
+      _connectingIds.remove(deviceId);
       _dashStateController.add(BleConnectionState.disconnected);
       return;
     }
@@ -352,6 +361,7 @@ class RealBleService implements BleService {
     _nusCmdQueue.setNusRxChar(_nusRxChar);
 
     dashConnected = true;
+    _connectingIds.remove(deviceId);
     _dashStateController.add(BleConnectionState.connected);
     _updateConnectedFlag(deviceId, true);
     _updateKnownDevice(deviceId, name: device.advName.isNotEmpty ? device.advName : device.platformName, appearance: 0x0480);
@@ -376,6 +386,7 @@ class RealBleService implements BleService {
       } catch (_) {}
     }
     _updateConnectedFlag(deviceId, false);
+    _connectingIds.remove(deviceId);
     _dashStateController.add(BleConnectionState.disconnected);
   }
 
@@ -417,11 +428,13 @@ class RealBleService implements BleService {
     final device = await _findDeviceById(deviceId);
     if (device == null) {
       _log.d('connectToHrm: device $deviceId not found');
+      _connectingIds.remove(deviceId);
       _hrmStateController.add(BleConnectionState.disconnected);
       return;
     }
 
     _hrmDevice = device;
+    _connectingIds.add(deviceId);
     _hrmStateController.add(BleConnectionState.connecting);
     _log.d('connectToHrm: found ${device.remoteId}');
 
@@ -436,6 +449,7 @@ class RealBleService implements BleService {
       if (event.device.remoteId == device.remoteId && event.connectionState == BluetoothConnectionState.disconnected) {
         _log.d('HRM disconnected');
         hrmConnected = false;
+        _connectingIds.remove(deviceId);
         _hrmStateController.add(BleConnectionState.disconnected);
         _onHrmDisconnected();
       }
@@ -443,10 +457,12 @@ class RealBleService implements BleService {
 
     // Connect.
     try {
+      _connectingIds.add(deviceId);
       await device.connect(license: License.nonprofit);
       _log.d('HRM connected');
     } catch (e) {
       _log.e('HRM connect failed: $e', error: e);
+      _connectingIds.remove(deviceId);
       _hrmStateController.add(BleConnectionState.disconnected);
       return;
     }
@@ -458,6 +474,7 @@ class RealBleService implements BleService {
     } catch (e) {
       _log.e('HRM discoverServices failed: $e', error: e);
       await device.disconnect();
+      _connectingIds.remove(deviceId);
       _hrmStateController.add(BleConnectionState.disconnected);
       return;
     }
@@ -486,6 +503,7 @@ class RealBleService implements BleService {
     }
 
     hrmConnected = true;
+    _connectingIds.remove(deviceId);
     _hrmStateController.add(BleConnectionState.connected);
     _updateConnectedFlag(deviceId, true);
     _updateKnownDevice(deviceId, name: device.advName.isNotEmpty ? device.advName : device.platformName, appearance: 0x0134);
@@ -510,6 +528,7 @@ class RealBleService implements BleService {
       } catch (_) {}
     }
     _updateConnectedFlag(deviceId, false);
+    _connectingIds.remove(deviceId);
     _hrmStateController.add(BleConnectionState.disconnected);
   }
 
