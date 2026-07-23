@@ -65,7 +65,7 @@ class MainPage extends ConsumerWidget {
       ),
       body: GestureDetector(
         // Swipe left anywhere on the main page to open Ride History.
-        // Negative primaryVelocity means the drag ended moving to the left.
+        behavior: HitTestBehavior.translucent, // allow swipes on empty space
         onHorizontalDragEnd: (details) {
           // Only trigger for actual leftward swipes (negative velocity), not taps (0.0).
           if (details.primaryVelocity != null && details.primaryVelocity! < -200) {

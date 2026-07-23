@@ -50,7 +50,8 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2500))..addStatusListener(_onStatus);
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000), reverseDuration: const Duration(milliseconds: 500))
+      ..addStatusListener(_onStatus);
   }
 
   void _onStatus(AnimationStatus status) {

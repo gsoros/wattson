@@ -23,6 +23,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void initState() {
     super.initState();
     _service = ref.read(bleServiceProvider);
+    _service!.stopScan();
     _service!.startScan();
   }
 
@@ -107,7 +108,6 @@ class _DeviceCard extends ConsumerStatefulWidget {
 }
 
 class _DeviceCardState extends ConsumerState<_DeviceCard> {
-  /// Module logger (auto-captures caller class + file:line).
   static final _log = AppLog.logFor('SettingsPage');
 
   /// Local connecting flag — set immediately on press, reset when the
@@ -143,12 +143,6 @@ class _DeviceCardState extends ConsumerState<_DeviceCard> {
 
     final dashConnected = dashState == BleConnectionState.connected;
     final hrmConnected = hrmState == BleConnectionState.connected;
-
-    _log.d(
-      'device=${widget.device}, isConnected=$isConnected, _isConnecting=$_isConnecting, '
-      'isCyclingComputer=$isCyclingComputer, isHrm=$isHrm, '
-      'dashConnected=$dashConnected, hrmConnected=$hrmConnected',
-    );
 
     // Slot availability: at most one CC and one HRM.
     final canConnect =
