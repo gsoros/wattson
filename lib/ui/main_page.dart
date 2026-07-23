@@ -25,7 +25,20 @@ class MainPage extends ConsumerWidget {
 
   /// Opens the distraction-free full-screen metrics view.
   void _openFullScreen(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const _FullScreenPage()));
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const _FullScreenPage(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.9, end: 1.0).animate(CurvedAnimation(parent: animation, curve: Curves.fastOutSlowIn)),
+              child: child,
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
