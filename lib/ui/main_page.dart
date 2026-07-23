@@ -305,7 +305,7 @@ class _RideContent extends ConsumerWidget {
 
     // -- Trip stats (shown while recording) --
     if (rs != null && rs.isActive) {
-      metrics.add(_TripStatsTile(elapsed: rs.elapsed, distanceKm: rs.distanceKm, elevationGainM: rs.elevationGainM));
+      metrics.add(_TripStatsTile(status: rs.status, elapsed: rs.elapsed, distanceKm: rs.distanceKm, elevationGainM: rs.elevationGainM));
     }
 
     return metrics.isEmpty || (!t.ordValid && !t.hrmValid)
@@ -325,7 +325,8 @@ class _RideContent extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _TripStatsTile extends StatelessWidget {
-  const _TripStatsTile({required this.elapsed, required this.distanceKm, required this.elevationGainM});
+  const _TripStatsTile({required this.status, required this.elapsed, required this.distanceKm, required this.elevationGainM});
+  final RecordingStatus status;
   final Duration elapsed;
   final double distanceKm;
   final double elevationGainM;
@@ -340,13 +341,17 @@ class _TripStatsTile extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            // Recording indicator: a red dot with a "REC" label.
-            Column(
-              children: [
-                Icon(Icons.fiber_manual_record, color: Colors.red, size: 18),
-                Text('REC', style: theme.textTheme.labelSmall?.copyWith(color: Colors.red)),
-              ],
-            ),
+            // Recording indicator: red dot + "REC" when recording,
+            // orange blinking dot + "PAUSED" when paused.
+            switch (status) {
+              RecordingStatus.paused => _PauseIndicator(theme: theme),
+              _ => Column(
+                children: [
+                  Icon(Icons.fiber_manual_record, color: Colors.red, size: 18),
+                  Text('REC', style: theme.textTheme.labelSmall?.copyWith(color: Colors.red)),
+                ],
+              ),
+            },
             _Stat(theme: theme, label: 'Time', value: _fmt(elapsed)),
             _Stat(theme: theme, label: 'Distance', value: '${distanceKm.toStringAsFixed(1)} km'),
             _Stat(theme: theme, label: 'Climb', value: '${elevationGainM.toStringAsFixed(0)} m'),
@@ -362,6 +367,45 @@ class _TripStatsTile extends StatelessWidget {
     final s = d.inSeconds.remainder(60);
     if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
     return '${m}m ${s.toString().padLeft(2, '0')}s';
+  }
+}
+
+/// An orange blinking pause indicator shown in the trip stats bar when the
+/// recording is paused. Uses a periodic timer to toggle opacity.
+class _PauseIndicator extends StatefulWidget {
+  const _PauseIndicator({required this.theme});
+  final ThemeData theme;
+
+  @override
+  State<_PauseIndicator> createState() => _PauseIndicatorState();
+}
+
+class _PauseIndicatorState extends State<_PauseIndicator> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller,
+      child: Column(
+        children: [
+          Icon(Icons.pause_circle_filled, color: Colors.orange, size: 18),
+          Text('PAUSED', style: widget.theme.textTheme.labelSmall?.copyWith(color: Colors.orange)),
+        ],
+      ),
+    );
   }
 }
 
