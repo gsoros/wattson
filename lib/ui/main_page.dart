@@ -259,15 +259,16 @@ class _RideContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final metrics = <Widget>[];
     final rs = ref.watch(recordingStateProvider).asData?.value;
+    final bool telemetryIsRecent = t.timestamp != null && DateTime.now().difference(t.timestamp!).inSeconds < 5;
 
     // -- Hero speed --
-    if (t.ordValid) {
+    if (t.ordValid && telemetryIsRecent) {
       metrics.add(_SpeedTile(speedKmh: t.speedKmh));
     }
 
     // -- Secondary grid --
     final gridChildren = <Widget>[];
-    if (t.ordValid) {
+    if (t.ordValid && telemetryIsRecent) {
       gridChildren.addAll([
         _MetricTile(label: 'Human Power', value: t.humanPowerW.toStringAsFixed(0), unit: 'W'),
         _MetricTile(label: 'Motor Power', value: t.motorPowerW.toStringAsFixed(0), unit: 'W'),
@@ -302,7 +303,7 @@ class _RideContent extends ConsumerWidget {
     }
 
     // -- Battery summary --
-    if (t.ordValid) {
+    if (t.ordValid && telemetryIsRecent) {
       metrics.add(
         Padding(
           padding: const EdgeInsets.fromLTRB(0.0, 4.0, 0.0, 0.0),
@@ -317,7 +318,7 @@ class _RideContent extends ConsumerWidget {
     }
 
     return metrics.isEmpty || (!t.ordValid && !t.hrmValid)
-        ? const Text('Waiting for data  ...')
+        ? const Center(child: Text('Waiting for data  ...'))
         : ListView(padding: EdgeInsets.fromLTRB(0, 8, 0, bottomPadding), children: metrics);
   }
 
