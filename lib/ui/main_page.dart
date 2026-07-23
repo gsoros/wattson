@@ -272,7 +272,15 @@ class _RideContent extends ConsumerWidget {
         _MetricTile(label: 'Human Power', value: t.humanPowerW.toStringAsFixed(0), unit: 'W'),
         _MetricTile(label: 'Motor Power', value: t.motorPowerW.toStringAsFixed(0), unit: 'W'),
         _MetricTile(label: 'Cadence', value: t.cadenceRpm.toString(), unit: 'RPM'),
-        _MetricTile(label: 'PAS Level', value: t.pasLevel.toString(), unit: ''),
+        _MetricTile(
+          label: 'PAS Level',
+          value: t.pasLevel == -1
+              ? 'walk'
+              : t.pasLevel == 0
+              ? '-'
+              : t.pasLevel.toString(),
+          unit: '',
+        ),
         _MetricTile(label: 'Range', value: t.rangeKm.toStringAsFixed(0), unit: 'km'),
       ]);
     }
@@ -541,7 +549,7 @@ class _BatteryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final barColor = soc > 20 ? Colors.green : (soc > 10 ? Colors.orange : Colors.red);
+    final barColor = soc > 50 ? Colors.green.shade500 : (soc > 25 ? Colors.orange.shade500 : Colors.red.shade500);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Padding(
