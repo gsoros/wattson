@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Include the Drift database so rides are never lost -->
+    <include domain="database" path="wattson.db" />
+    <!-- Include SharedPreferences (BLE MACs, settings) -->
+    <include domain="sharedpref" path="." />
+</full-backup-content>
