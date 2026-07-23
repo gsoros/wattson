@@ -102,8 +102,8 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
           }
         },
         child: SizedBox(
-          width: 52,
-          height: 52,
+          width: 72,
+          height: 72,
           child: Stack(
             key: _stackKey,
             // Allow the feedback to overflow the button so a finger resting on it
@@ -143,10 +143,10 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
               */
               Container(
                 key: _buttonKey,
-                width: 40,
-                height: 40,
+                width: 90,
+                height: 90,
                 decoration: BoxDecoration(shape: BoxShape.circle, color: widget.backgroundColor),
-                child: Icon(widget.icon, color: widget.iconColor, size: 20),
+                child: Icon(widget.icon, color: widget.iconColor, size: 40),
               ),
             ],
           ),
