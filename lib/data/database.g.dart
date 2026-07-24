@@ -163,6 +163,40 @@ class $RidesTable extends Rides with TableInfo<$RidesTable, Ride> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _weightedAvgPowerWMeta = const VerificationMeta(
+    'weightedAvgPowerW',
+  );
+  @override
+  late final GeneratedColumn<double> weightedAvgPowerW =
+      GeneratedColumn<double>(
+        'weighted_avg_power_w',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _rideFtpWMeta = const VerificationMeta(
+    'rideFtpW',
+  );
+  @override
+  late final GeneratedColumn<double> rideFtpW = GeneratedColumn<double>(
+    'ride_ftp_w',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _motorEnergyWhMeta = const VerificationMeta(
+    'motorEnergyWh',
+  );
+  @override
+  late final GeneratedColumn<double> motorEnergyWh = GeneratedColumn<double>(
+    'motor_energy_wh',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -179,6 +213,9 @@ class $RidesTable extends Rides with TableInfo<$RidesTable, Ride> {
     assistRatio,
     notes,
     title,
+    weightedAvgPowerW,
+    rideFtpW,
+    motorEnergyWh,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -296,6 +333,30 @@ class $RidesTable extends Rides with TableInfo<$RidesTable, Ride> {
         title.isAcceptableOrUnknown(data['title']!, _titleMeta),
       );
     }
+    if (data.containsKey('weighted_avg_power_w')) {
+      context.handle(
+        _weightedAvgPowerWMeta,
+        weightedAvgPowerW.isAcceptableOrUnknown(
+          data['weighted_avg_power_w']!,
+          _weightedAvgPowerWMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ride_ftp_w')) {
+      context.handle(
+        _rideFtpWMeta,
+        rideFtpW.isAcceptableOrUnknown(data['ride_ftp_w']!, _rideFtpWMeta),
+      );
+    }
+    if (data.containsKey('motor_energy_wh')) {
+      context.handle(
+        _motorEnergyWhMeta,
+        motorEnergyWh.isAcceptableOrUnknown(
+          data['motor_energy_wh']!,
+          _motorEnergyWhMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -361,6 +422,18 @@ class $RidesTable extends Rides with TableInfo<$RidesTable, Ride> {
         DriftSqlType.string,
         data['${effectivePrefix}title'],
       ),
+      weightedAvgPowerW: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}weighted_avg_power_w'],
+      ),
+      rideFtpW: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}ride_ftp_w'],
+      ),
+      motorEnergyWh: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}motor_energy_wh'],
+      ),
     );
   }
 
@@ -387,6 +460,15 @@ class Ride extends DataClass implements Insertable<Ride> {
 
   /// User-editable name for the ride. Null/empty falls back to a date label.
   final String? title;
+
+  /// Weighted Average Power (4th-power mean of human power).
+  final double? weightedAvgPowerW;
+
+  /// Functional Threshold Power at the time this ride was recorded.
+  final double? rideFtpW;
+
+  /// Total motor energy used, in watt-hours.
+  final double? motorEnergyWh;
   const Ride({
     required this.id,
     required this.startTime,
@@ -402,6 +484,9 @@ class Ride extends DataClass implements Insertable<Ride> {
     this.assistRatio,
     this.notes,
     this.title,
+    this.weightedAvgPowerW,
+    this.rideFtpW,
+    this.motorEnergyWh,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -437,6 +522,15 @@ class Ride extends DataClass implements Insertable<Ride> {
     }
     if (!nullToAbsent || title != null) {
       map['title'] = Variable<String>(title);
+    }
+    if (!nullToAbsent || weightedAvgPowerW != null) {
+      map['weighted_avg_power_w'] = Variable<double>(weightedAvgPowerW);
+    }
+    if (!nullToAbsent || rideFtpW != null) {
+      map['ride_ftp_w'] = Variable<double>(rideFtpW);
+    }
+    if (!nullToAbsent || motorEnergyWh != null) {
+      map['motor_energy_wh'] = Variable<double>(motorEnergyWh);
     }
     return map;
   }
@@ -475,6 +569,15 @@ class Ride extends DataClass implements Insertable<Ride> {
       title: title == null && nullToAbsent
           ? const Value.absent()
           : Value(title),
+      weightedAvgPowerW: weightedAvgPowerW == null && nullToAbsent
+          ? const Value.absent()
+          : Value(weightedAvgPowerW),
+      rideFtpW: rideFtpW == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rideFtpW),
+      motorEnergyWh: motorEnergyWh == null && nullToAbsent
+          ? const Value.absent()
+          : Value(motorEnergyWh),
     );
   }
 
@@ -498,6 +601,11 @@ class Ride extends DataClass implements Insertable<Ride> {
       assistRatio: serializer.fromJson<double?>(json['assistRatio']),
       notes: serializer.fromJson<String?>(json['notes']),
       title: serializer.fromJson<String?>(json['title']),
+      weightedAvgPowerW: serializer.fromJson<double?>(
+        json['weightedAvgPowerW'],
+      ),
+      rideFtpW: serializer.fromJson<double?>(json['rideFtpW']),
+      motorEnergyWh: serializer.fromJson<double?>(json['motorEnergyWh']),
     );
   }
   @override
@@ -518,6 +626,9 @@ class Ride extends DataClass implements Insertable<Ride> {
       'assistRatio': serializer.toJson<double?>(assistRatio),
       'notes': serializer.toJson<String?>(notes),
       'title': serializer.toJson<String?>(title),
+      'weightedAvgPowerW': serializer.toJson<double?>(weightedAvgPowerW),
+      'rideFtpW': serializer.toJson<double?>(rideFtpW),
+      'motorEnergyWh': serializer.toJson<double?>(motorEnergyWh),
     };
   }
 
@@ -536,6 +647,9 @@ class Ride extends DataClass implements Insertable<Ride> {
     Value<double?> assistRatio = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     Value<String?> title = const Value.absent(),
+    Value<double?> weightedAvgPowerW = const Value.absent(),
+    Value<double?> rideFtpW = const Value.absent(),
+    Value<double?> motorEnergyWh = const Value.absent(),
   }) => Ride(
     id: id ?? this.id,
     startTime: startTime ?? this.startTime,
@@ -559,6 +673,13 @@ class Ride extends DataClass implements Insertable<Ride> {
     assistRatio: assistRatio.present ? assistRatio.value : this.assistRatio,
     notes: notes.present ? notes.value : this.notes,
     title: title.present ? title.value : this.title,
+    weightedAvgPowerW: weightedAvgPowerW.present
+        ? weightedAvgPowerW.value
+        : this.weightedAvgPowerW,
+    rideFtpW: rideFtpW.present ? rideFtpW.value : this.rideFtpW,
+    motorEnergyWh: motorEnergyWh.present
+        ? motorEnergyWh.value
+        : this.motorEnergyWh,
   );
   Ride copyWithCompanion(RidesCompanion data) {
     return Ride(
@@ -592,6 +713,13 @@ class Ride extends DataClass implements Insertable<Ride> {
           : this.assistRatio,
       notes: data.notes.present ? data.notes.value : this.notes,
       title: data.title.present ? data.title.value : this.title,
+      weightedAvgPowerW: data.weightedAvgPowerW.present
+          ? data.weightedAvgPowerW.value
+          : this.weightedAvgPowerW,
+      rideFtpW: data.rideFtpW.present ? data.rideFtpW.value : this.rideFtpW,
+      motorEnergyWh: data.motorEnergyWh.present
+          ? data.motorEnergyWh.value
+          : this.motorEnergyWh,
     );
   }
 
@@ -611,7 +739,10 @@ class Ride extends DataClass implements Insertable<Ride> {
           ..write('avgHrBpm: $avgHrBpm, ')
           ..write('assistRatio: $assistRatio, ')
           ..write('notes: $notes, ')
-          ..write('title: $title')
+          ..write('title: $title, ')
+          ..write('weightedAvgPowerW: $weightedAvgPowerW, ')
+          ..write('rideFtpW: $rideFtpW, ')
+          ..write('motorEnergyWh: $motorEnergyWh')
           ..write(')'))
         .toString();
   }
@@ -632,6 +763,9 @@ class Ride extends DataClass implements Insertable<Ride> {
     assistRatio,
     notes,
     title,
+    weightedAvgPowerW,
+    rideFtpW,
+    motorEnergyWh,
   );
   @override
   bool operator ==(Object other) =>
@@ -650,7 +784,10 @@ class Ride extends DataClass implements Insertable<Ride> {
           other.avgHrBpm == this.avgHrBpm &&
           other.assistRatio == this.assistRatio &&
           other.notes == this.notes &&
-          other.title == this.title);
+          other.title == this.title &&
+          other.weightedAvgPowerW == this.weightedAvgPowerW &&
+          other.rideFtpW == this.rideFtpW &&
+          other.motorEnergyWh == this.motorEnergyWh);
 }
 
 class RidesCompanion extends UpdateCompanion<Ride> {
@@ -668,6 +805,9 @@ class RidesCompanion extends UpdateCompanion<Ride> {
   final Value<double?> assistRatio;
   final Value<String?> notes;
   final Value<String?> title;
+  final Value<double?> weightedAvgPowerW;
+  final Value<double?> rideFtpW;
+  final Value<double?> motorEnergyWh;
   const RidesCompanion({
     this.id = const Value.absent(),
     this.startTime = const Value.absent(),
@@ -683,6 +823,9 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     this.assistRatio = const Value.absent(),
     this.notes = const Value.absent(),
     this.title = const Value.absent(),
+    this.weightedAvgPowerW = const Value.absent(),
+    this.rideFtpW = const Value.absent(),
+    this.motorEnergyWh = const Value.absent(),
   });
   RidesCompanion.insert({
     this.id = const Value.absent(),
@@ -699,6 +842,9 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     this.assistRatio = const Value.absent(),
     this.notes = const Value.absent(),
     this.title = const Value.absent(),
+    this.weightedAvgPowerW = const Value.absent(),
+    this.rideFtpW = const Value.absent(),
+    this.motorEnergyWh = const Value.absent(),
   }) : startTime = Value(startTime);
   static Insertable<Ride> custom({
     Expression<int>? id,
@@ -715,6 +861,9 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     Expression<double>? assistRatio,
     Expression<String>? notes,
     Expression<String>? title,
+    Expression<double>? weightedAvgPowerW,
+    Expression<double>? rideFtpW,
+    Expression<double>? motorEnergyWh,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -731,6 +880,9 @@ class RidesCompanion extends UpdateCompanion<Ride> {
       if (assistRatio != null) 'assist_ratio': assistRatio,
       if (notes != null) 'notes': notes,
       if (title != null) 'title': title,
+      if (weightedAvgPowerW != null) 'weighted_avg_power_w': weightedAvgPowerW,
+      if (rideFtpW != null) 'ride_ftp_w': rideFtpW,
+      if (motorEnergyWh != null) 'motor_energy_wh': motorEnergyWh,
     });
   }
 
@@ -749,6 +901,9 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     Value<double?>? assistRatio,
     Value<String?>? notes,
     Value<String?>? title,
+    Value<double?>? weightedAvgPowerW,
+    Value<double?>? rideFtpW,
+    Value<double?>? motorEnergyWh,
   }) {
     return RidesCompanion(
       id: id ?? this.id,
@@ -765,6 +920,9 @@ class RidesCompanion extends UpdateCompanion<Ride> {
       assistRatio: assistRatio ?? this.assistRatio,
       notes: notes ?? this.notes,
       title: title ?? this.title,
+      weightedAvgPowerW: weightedAvgPowerW ?? this.weightedAvgPowerW,
+      rideFtpW: rideFtpW ?? this.rideFtpW,
+      motorEnergyWh: motorEnergyWh ?? this.motorEnergyWh,
     );
   }
 
@@ -813,6 +971,15 @@ class RidesCompanion extends UpdateCompanion<Ride> {
     if (title.present) {
       map['title'] = Variable<String>(title.value);
     }
+    if (weightedAvgPowerW.present) {
+      map['weighted_avg_power_w'] = Variable<double>(weightedAvgPowerW.value);
+    }
+    if (rideFtpW.present) {
+      map['ride_ftp_w'] = Variable<double>(rideFtpW.value);
+    }
+    if (motorEnergyWh.present) {
+      map['motor_energy_wh'] = Variable<double>(motorEnergyWh.value);
+    }
     return map;
   }
 
@@ -832,7 +999,10 @@ class RidesCompanion extends UpdateCompanion<Ride> {
           ..write('avgHrBpm: $avgHrBpm, ')
           ..write('assistRatio: $assistRatio, ')
           ..write('notes: $notes, ')
-          ..write('title: $title')
+          ..write('title: $title, ')
+          ..write('weightedAvgPowerW: $weightedAvgPowerW, ')
+          ..write('rideFtpW: $rideFtpW, ')
+          ..write('motorEnergyWh: $motorEnergyWh')
           ..write(')'))
         .toString();
   }
@@ -1722,16 +1892,339 @@ class SamplesCompanion extends UpdateCompanion<Sample> {
   }
 }
 
+class $PasLevelDistributionTable extends PasLevelDistribution
+    with TableInfo<$PasLevelDistributionTable, PasLevelDistributionData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PasLevelDistributionTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _rideIdMeta = const VerificationMeta('rideId');
+  @override
+  late final GeneratedColumn<int> rideId = GeneratedColumn<int>(
+    'ride_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES rides (id)',
+    ),
+  );
+  static const VerificationMeta _pasLevelMeta = const VerificationMeta(
+    'pasLevel',
+  );
+  @override
+  late final GeneratedColumn<int> pasLevel = GeneratedColumn<int>(
+    'pas_level',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sampleCountMeta = const VerificationMeta(
+    'sampleCount',
+  );
+  @override
+  late final GeneratedColumn<int> sampleCount = GeneratedColumn<int>(
+    'sample_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, rideId, pasLevel, sampleCount];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pas_level_distribution';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PasLevelDistributionData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('ride_id')) {
+      context.handle(
+        _rideIdMeta,
+        rideId.isAcceptableOrUnknown(data['ride_id']!, _rideIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_rideIdMeta);
+    }
+    if (data.containsKey('pas_level')) {
+      context.handle(
+        _pasLevelMeta,
+        pasLevel.isAcceptableOrUnknown(data['pas_level']!, _pasLevelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pasLevelMeta);
+    }
+    if (data.containsKey('sample_count')) {
+      context.handle(
+        _sampleCountMeta,
+        sampleCount.isAcceptableOrUnknown(
+          data['sample_count']!,
+          _sampleCountMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sampleCountMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {rideId, pasLevel},
+  ];
+  @override
+  PasLevelDistributionData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PasLevelDistributionData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      rideId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}ride_id'],
+      )!,
+      pasLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pas_level'],
+      )!,
+      sampleCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sample_count'],
+      )!,
+    );
+  }
+
+  @override
+  $PasLevelDistributionTable createAlias(String alias) {
+    return $PasLevelDistributionTable(attachedDatabase, alias);
+  }
+}
+
+class PasLevelDistributionData extends DataClass
+    implements Insertable<PasLevelDistributionData> {
+  final int id;
+  final int rideId;
+  final int pasLevel;
+  final int sampleCount;
+  const PasLevelDistributionData({
+    required this.id,
+    required this.rideId,
+    required this.pasLevel,
+    required this.sampleCount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['ride_id'] = Variable<int>(rideId);
+    map['pas_level'] = Variable<int>(pasLevel);
+    map['sample_count'] = Variable<int>(sampleCount);
+    return map;
+  }
+
+  PasLevelDistributionCompanion toCompanion(bool nullToAbsent) {
+    return PasLevelDistributionCompanion(
+      id: Value(id),
+      rideId: Value(rideId),
+      pasLevel: Value(pasLevel),
+      sampleCount: Value(sampleCount),
+    );
+  }
+
+  factory PasLevelDistributionData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PasLevelDistributionData(
+      id: serializer.fromJson<int>(json['id']),
+      rideId: serializer.fromJson<int>(json['rideId']),
+      pasLevel: serializer.fromJson<int>(json['pasLevel']),
+      sampleCount: serializer.fromJson<int>(json['sampleCount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'rideId': serializer.toJson<int>(rideId),
+      'pasLevel': serializer.toJson<int>(pasLevel),
+      'sampleCount': serializer.toJson<int>(sampleCount),
+    };
+  }
+
+  PasLevelDistributionData copyWith({
+    int? id,
+    int? rideId,
+    int? pasLevel,
+    int? sampleCount,
+  }) => PasLevelDistributionData(
+    id: id ?? this.id,
+    rideId: rideId ?? this.rideId,
+    pasLevel: pasLevel ?? this.pasLevel,
+    sampleCount: sampleCount ?? this.sampleCount,
+  );
+  PasLevelDistributionData copyWithCompanion(
+    PasLevelDistributionCompanion data,
+  ) {
+    return PasLevelDistributionData(
+      id: data.id.present ? data.id.value : this.id,
+      rideId: data.rideId.present ? data.rideId.value : this.rideId,
+      pasLevel: data.pasLevel.present ? data.pasLevel.value : this.pasLevel,
+      sampleCount: data.sampleCount.present
+          ? data.sampleCount.value
+          : this.sampleCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PasLevelDistributionData(')
+          ..write('id: $id, ')
+          ..write('rideId: $rideId, ')
+          ..write('pasLevel: $pasLevel, ')
+          ..write('sampleCount: $sampleCount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, rideId, pasLevel, sampleCount);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PasLevelDistributionData &&
+          other.id == this.id &&
+          other.rideId == this.rideId &&
+          other.pasLevel == this.pasLevel &&
+          other.sampleCount == this.sampleCount);
+}
+
+class PasLevelDistributionCompanion
+    extends UpdateCompanion<PasLevelDistributionData> {
+  final Value<int> id;
+  final Value<int> rideId;
+  final Value<int> pasLevel;
+  final Value<int> sampleCount;
+  const PasLevelDistributionCompanion({
+    this.id = const Value.absent(),
+    this.rideId = const Value.absent(),
+    this.pasLevel = const Value.absent(),
+    this.sampleCount = const Value.absent(),
+  });
+  PasLevelDistributionCompanion.insert({
+    this.id = const Value.absent(),
+    required int rideId,
+    required int pasLevel,
+    required int sampleCount,
+  }) : rideId = Value(rideId),
+       pasLevel = Value(pasLevel),
+       sampleCount = Value(sampleCount);
+  static Insertable<PasLevelDistributionData> custom({
+    Expression<int>? id,
+    Expression<int>? rideId,
+    Expression<int>? pasLevel,
+    Expression<int>? sampleCount,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (rideId != null) 'ride_id': rideId,
+      if (pasLevel != null) 'pas_level': pasLevel,
+      if (sampleCount != null) 'sample_count': sampleCount,
+    });
+  }
+
+  PasLevelDistributionCompanion copyWith({
+    Value<int>? id,
+    Value<int>? rideId,
+    Value<int>? pasLevel,
+    Value<int>? sampleCount,
+  }) {
+    return PasLevelDistributionCompanion(
+      id: id ?? this.id,
+      rideId: rideId ?? this.rideId,
+      pasLevel: pasLevel ?? this.pasLevel,
+      sampleCount: sampleCount ?? this.sampleCount,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (rideId.present) {
+      map['ride_id'] = Variable<int>(rideId.value);
+    }
+    if (pasLevel.present) {
+      map['pas_level'] = Variable<int>(pasLevel.value);
+    }
+    if (sampleCount.present) {
+      map['sample_count'] = Variable<int>(sampleCount.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PasLevelDistributionCompanion(')
+          ..write('id: $id, ')
+          ..write('rideId: $rideId, ')
+          ..write('pasLevel: $pasLevel, ')
+          ..write('sampleCount: $sampleCount')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $RidesTable rides = $RidesTable(this);
   late final $SamplesTable samples = $SamplesTable(this);
+  late final $PasLevelDistributionTable pasLevelDistribution =
+      $PasLevelDistributionTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [rides, samples];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    rides,
+    samples,
+    pasLevelDistribution,
+  ];
 }
 
 typedef $$RidesTableCreateCompanionBuilder =
@@ -1750,6 +2243,9 @@ typedef $$RidesTableCreateCompanionBuilder =
       Value<double?> assistRatio,
       Value<String?> notes,
       Value<String?> title,
+      Value<double?> weightedAvgPowerW,
+      Value<double?> rideFtpW,
+      Value<double?> motorEnergyWh,
     });
 typedef $$RidesTableUpdateCompanionBuilder =
     RidesCompanion Function({
@@ -1767,6 +2263,9 @@ typedef $$RidesTableUpdateCompanionBuilder =
       Value<double?> assistRatio,
       Value<String?> notes,
       Value<String?> title,
+      Value<double?> weightedAvgPowerW,
+      Value<double?> rideFtpW,
+      Value<double?> motorEnergyWh,
     });
 
 final class $$RidesTableReferences
@@ -1787,6 +2286,31 @@ final class $$RidesTableReferences
     ).filter((f) => f.rideId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_samplesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $PasLevelDistributionTable,
+    List<PasLevelDistributionData>
+  >
+  _pasLevelDistributionRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.pasLevelDistribution,
+        aliasName: 'rides__id__pas_level_distribution__ride_id',
+      );
+
+  $$PasLevelDistributionTableProcessedTableManager
+  get pasLevelDistributionRefs {
+    final manager = $$PasLevelDistributionTableTableManager(
+      $_db,
+      $_db.pasLevelDistribution,
+    ).filter((f) => f.rideId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _pasLevelDistributionRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -1871,6 +2395,21 @@ class $$RidesTableFilterComposer extends Composer<_$AppDatabase, $RidesTable> {
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get weightedAvgPowerW => $composableBuilder(
+    column: $table.weightedAvgPowerW,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get rideFtpW => $composableBuilder(
+    column: $table.rideFtpW,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get motorEnergyWh => $composableBuilder(
+    column: $table.motorEnergyWh,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> samplesRefs(
     Expression<bool> Function($$SamplesTableFilterComposer f) f,
   ) {
@@ -1887,6 +2426,31 @@ class $$RidesTableFilterComposer extends Composer<_$AppDatabase, $RidesTable> {
           }) => $$SamplesTableFilterComposer(
             $db: $db,
             $table: $db.samples,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> pasLevelDistributionRefs(
+    Expression<bool> Function($$PasLevelDistributionTableFilterComposer f) f,
+  ) {
+    final $$PasLevelDistributionTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.pasLevelDistribution,
+      getReferencedColumn: (t) => t.rideId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PasLevelDistributionTableFilterComposer(
+            $db: $db,
+            $table: $db.pasLevelDistribution,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1975,6 +2539,21 @@ class $$RidesTableOrderingComposer
     column: $table.title,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get weightedAvgPowerW => $composableBuilder(
+    column: $table.weightedAvgPowerW,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get rideFtpW => $composableBuilder(
+    column: $table.rideFtpW,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get motorEnergyWh => $composableBuilder(
+    column: $table.motorEnergyWh,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$RidesTableAnnotationComposer
@@ -2044,6 +2623,19 @@ class $$RidesTableAnnotationComposer
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
 
+  GeneratedColumn<double> get weightedAvgPowerW => $composableBuilder(
+    column: $table.weightedAvgPowerW,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get rideFtpW =>
+      $composableBuilder(column: $table.rideFtpW, builder: (column) => column);
+
+  GeneratedColumn<double> get motorEnergyWh => $composableBuilder(
+    column: $table.motorEnergyWh,
+    builder: (column) => column,
+  );
+
   Expression<T> samplesRefs<T extends Object>(
     Expression<T> Function($$SamplesTableAnnotationComposer a) f,
   ) {
@@ -2068,6 +2660,32 @@ class $$RidesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> pasLevelDistributionRefs<T extends Object>(
+    Expression<T> Function($$PasLevelDistributionTableAnnotationComposer a) f,
+  ) {
+    final $$PasLevelDistributionTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.pasLevelDistribution,
+          getReferencedColumn: (t) => t.rideId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$PasLevelDistributionTableAnnotationComposer(
+                $db: $db,
+                $table: $db.pasLevelDistribution,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$RidesTableTableManager
@@ -2083,7 +2701,10 @@ class $$RidesTableTableManager
           $$RidesTableUpdateCompanionBuilder,
           (Ride, $$RidesTableReferences),
           Ride,
-          PrefetchHooks Function({bool samplesRefs})
+          PrefetchHooks Function({
+            bool samplesRefs,
+            bool pasLevelDistributionRefs,
+          })
         > {
   $$RidesTableTableManager(_$AppDatabase db, $RidesTable table)
     : super(
@@ -2112,6 +2733,9 @@ class $$RidesTableTableManager
                 Value<double?> assistRatio = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<String?> title = const Value.absent(),
+                Value<double?> weightedAvgPowerW = const Value.absent(),
+                Value<double?> rideFtpW = const Value.absent(),
+                Value<double?> motorEnergyWh = const Value.absent(),
               }) => RidesCompanion(
                 id: id,
                 startTime: startTime,
@@ -2127,6 +2751,9 @@ class $$RidesTableTableManager
                 assistRatio: assistRatio,
                 notes: notes,
                 title: title,
+                weightedAvgPowerW: weightedAvgPowerW,
+                rideFtpW: rideFtpW,
+                motorEnergyWh: motorEnergyWh,
               ),
           createCompanionCallback:
               ({
@@ -2144,6 +2771,9 @@ class $$RidesTableTableManager
                 Value<double?> assistRatio = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<String?> title = const Value.absent(),
+                Value<double?> weightedAvgPowerW = const Value.absent(),
+                Value<double?> rideFtpW = const Value.absent(),
+                Value<double?> motorEnergyWh = const Value.absent(),
               }) => RidesCompanion.insert(
                 id: id,
                 startTime: startTime,
@@ -2159,6 +2789,9 @@ class $$RidesTableTableManager
                 assistRatio: assistRatio,
                 notes: notes,
                 title: title,
+                weightedAvgPowerW: weightedAvgPowerW,
+                rideFtpW: rideFtpW,
+                motorEnergyWh: motorEnergyWh,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -2166,29 +2799,55 @@ class $$RidesTableTableManager
                     (e.readTable(table), $$RidesTableReferences(db, table, e)),
               )
               .toList(),
-          prefetchHooksCallback: ({samplesRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (samplesRefs) db.samples],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (samplesRefs)
-                    await $_getPrefetchedData<Ride, $RidesTable, Sample>(
-                      currentTable: table,
-                      referencedTable: $$RidesTableReferences._samplesRefsTable(
-                        db,
-                      ),
-                      managerFromTypedResult: (p0) =>
-                          $$RidesTableReferences(db, table, p0).samplesRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.rideId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({samplesRefs = false, pasLevelDistributionRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (samplesRefs) db.samples,
+                    if (pasLevelDistributionRefs) db.pasLevelDistribution,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (samplesRefs)
+                        await $_getPrefetchedData<Ride, $RidesTable, Sample>(
+                          currentTable: table,
+                          referencedTable: $$RidesTableReferences
+                              ._samplesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RidesTableReferences(db, table, p0).samplesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.rideId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (pasLevelDistributionRefs)
+                        await $_getPrefetchedData<
+                          Ride,
+                          $RidesTable,
+                          PasLevelDistributionData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$RidesTableReferences
+                              ._pasLevelDistributionRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RidesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).pasLevelDistributionRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.rideId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -2205,7 +2864,7 @@ typedef $$RidesTableProcessedTableManager =
       $$RidesTableUpdateCompanionBuilder,
       (Ride, $$RidesTableReferences),
       Ride,
-      PrefetchHooks Function({bool samplesRefs})
+      PrefetchHooks Function({bool samplesRefs, bool pasLevelDistributionRefs})
     >;
 typedef $$SamplesTableCreateCompanionBuilder =
     SamplesCompanion Function({
@@ -2733,6 +3392,319 @@ typedef $$SamplesTableProcessedTableManager =
       Sample,
       PrefetchHooks Function({bool rideId})
     >;
+typedef $$PasLevelDistributionTableCreateCompanionBuilder =
+    PasLevelDistributionCompanion Function({
+      Value<int> id,
+      required int rideId,
+      required int pasLevel,
+      required int sampleCount,
+    });
+typedef $$PasLevelDistributionTableUpdateCompanionBuilder =
+    PasLevelDistributionCompanion Function({
+      Value<int> id,
+      Value<int> rideId,
+      Value<int> pasLevel,
+      Value<int> sampleCount,
+    });
+
+final class $$PasLevelDistributionTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $PasLevelDistributionTable,
+          PasLevelDistributionData
+        > {
+  $$PasLevelDistributionTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $RidesTable _rideIdTable(_$AppDatabase db) =>
+      db.rides.createAlias('pas_level_distribution__ride_id__rides__id');
+
+  $$RidesTableProcessedTableManager get rideId {
+    final $_column = $_itemColumn<int>('ride_id')!;
+
+    final manager = $$RidesTableTableManager(
+      $_db,
+      $_db.rides,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_rideIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$PasLevelDistributionTableFilterComposer
+    extends Composer<_$AppDatabase, $PasLevelDistributionTable> {
+  $$PasLevelDistributionTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pasLevel => $composableBuilder(
+    column: $table.pasLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sampleCount => $composableBuilder(
+    column: $table.sampleCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$RidesTableFilterComposer get rideId {
+    final $$RidesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.rideId,
+      referencedTable: $db.rides,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RidesTableFilterComposer(
+            $db: $db,
+            $table: $db.rides,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PasLevelDistributionTableOrderingComposer
+    extends Composer<_$AppDatabase, $PasLevelDistributionTable> {
+  $$PasLevelDistributionTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pasLevel => $composableBuilder(
+    column: $table.pasLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sampleCount => $composableBuilder(
+    column: $table.sampleCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$RidesTableOrderingComposer get rideId {
+    final $$RidesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.rideId,
+      referencedTable: $db.rides,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RidesTableOrderingComposer(
+            $db: $db,
+            $table: $db.rides,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PasLevelDistributionTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PasLevelDistributionTable> {
+  $$PasLevelDistributionTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get pasLevel =>
+      $composableBuilder(column: $table.pasLevel, builder: (column) => column);
+
+  GeneratedColumn<int> get sampleCount => $composableBuilder(
+    column: $table.sampleCount,
+    builder: (column) => column,
+  );
+
+  $$RidesTableAnnotationComposer get rideId {
+    final $$RidesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.rideId,
+      referencedTable: $db.rides,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RidesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.rides,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PasLevelDistributionTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PasLevelDistributionTable,
+          PasLevelDistributionData,
+          $$PasLevelDistributionTableFilterComposer,
+          $$PasLevelDistributionTableOrderingComposer,
+          $$PasLevelDistributionTableAnnotationComposer,
+          $$PasLevelDistributionTableCreateCompanionBuilder,
+          $$PasLevelDistributionTableUpdateCompanionBuilder,
+          (PasLevelDistributionData, $$PasLevelDistributionTableReferences),
+          PasLevelDistributionData,
+          PrefetchHooks Function({bool rideId})
+        > {
+  $$PasLevelDistributionTableTableManager(
+    _$AppDatabase db,
+    $PasLevelDistributionTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PasLevelDistributionTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PasLevelDistributionTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PasLevelDistributionTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> rideId = const Value.absent(),
+                Value<int> pasLevel = const Value.absent(),
+                Value<int> sampleCount = const Value.absent(),
+              }) => PasLevelDistributionCompanion(
+                id: id,
+                rideId: rideId,
+                pasLevel: pasLevel,
+                sampleCount: sampleCount,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int rideId,
+                required int pasLevel,
+                required int sampleCount,
+              }) => PasLevelDistributionCompanion.insert(
+                id: id,
+                rideId: rideId,
+                pasLevel: pasLevel,
+                sampleCount: sampleCount,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$PasLevelDistributionTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({rideId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (rideId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.rideId,
+                                referencedTable:
+                                    $$PasLevelDistributionTableReferences
+                                        ._rideIdTable(db),
+                                referencedColumn:
+                                    $$PasLevelDistributionTableReferences
+                                        ._rideIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$PasLevelDistributionTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PasLevelDistributionTable,
+      PasLevelDistributionData,
+      $$PasLevelDistributionTableFilterComposer,
+      $$PasLevelDistributionTableOrderingComposer,
+      $$PasLevelDistributionTableAnnotationComposer,
+      $$PasLevelDistributionTableCreateCompanionBuilder,
+      $$PasLevelDistributionTableUpdateCompanionBuilder,
+      (PasLevelDistributionData, $$PasLevelDistributionTableReferences),
+      PasLevelDistributionData,
+      PrefetchHooks Function({bool rideId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2741,4 +3713,6 @@ class $AppDatabaseManager {
       $$RidesTableTableManager(_db, _db.rides);
   $$SamplesTableTableManager get samples =>
       $$SamplesTableTableManager(_db, _db.samples);
+  $$PasLevelDistributionTableTableManager get pasLevelDistribution =>
+      $$PasLevelDistributionTableTableManager(_db, _db.pasLevelDistribution);
 }

@@ -303,6 +303,7 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 | M6c | Navigation + UX polish: pure Navigator (drop PageView), swipe gestures, full-screen mode, REC indicator, custom launcher icon, bundle id `org.gsoros.wattson` | **DONE** |
 | M7 | Device config (Wi-Fi, hostname, etc. via NUS) | **DONE** |
 | M8 | Permissions, iOS pass **DEFERRED**, tests **DEFERRED**, polish | **DONE** |
+| M9 | Ride stats overhaul: live NP, IF/TSS, FTP settings, PAS distribution, motor energy, collapsible RideDetails | **DONE** |
 
 **Firmware dependencies:** M1 needs NUS only for config (M7); M2's push-to-Dash
 needs the HR write char. Both firmware tasks are DONE. Protocol spec written as
@@ -313,6 +314,43 @@ needs the HR write char. Both firmware tasks are DONE. Protocol spec written as
 - Version bumped from `1.0.0+1` to `1.1.0+1` in `pubspec.yaml`.
 - All milestones M0–M8 complete. App is stable for daily use.
 - `CHANGELOG.md` created.
+
+## v1.2.0 — Ride stats overhaul (2026-07-24)
+
+- Version bumped from `1.1.0+1` to `1.2.0+1` in `pubspec.yaml`.
+
+### New files
+
+| File | Purpose |
+|------|---------|
+| `lib/util/normalized_power.dart` | `NormalizedPowerCalculator` — shared 30s rolling NP algorithm |
+| `lib/util/ride_metrics.dart` | `computeIF()`, `computeTSS()` pure functions |
+
+### Modified files
+
+| File | Change |
+|------|--------|
+| `lib/data/tables.dart` | Added `weightedAvgPowerW`, `rideFtpW`, `motorEnergyWh` to `Rides`; new `PasLevelDistribution` table |
+| `lib/data/database.dart` | Schema v3 migration for new columns + table |
+| `lib/data/recording_service.dart` | Live NP calculator in `_onTelemetry`; batch NP in `_computeRideStats`; motor energy; PAS distribution writes; zero-excluded cadence; FTP capture at stop |
+| `lib/models/recording_state.dart` | Live accumulators (`movingSampleCount`, `totalHumanPower`, `totalCadence`, `cadenceSampleCount`, `totalMotorPower`, `pasLevelCounts`, `normalizedPower`) |
+| `lib/ui/main_page.dart` | Live stats tiles (Avg Power, WAP, Avg Cadence) during recording |
+| `lib/ui/settings_page.dart` | FTP input card at top of settings |
+| `lib/ui/ride_details_page.dart` | Collapsible sections (Ride/Performance/Movement/Assistance); WAP/IF/TSS display; editable Ride FTP; motor energy; PAS distribution; moving/stopped time; avg speed |
+| `lib/providers/recording_provider.dart` | `ftpProvider` (SharedPreferences-backed) |
+| `lib/main.dart` | FTP loaded at startup |
+
+### Key decisions
+
+- NP (30s rolling average) used instead of simple WAP (4th-power mean of all samples).
+  Labeled "WAP" in the UI to avoid TrainingPeaks trademark on "Normalized Power".
+- IF and TSS computed on-the-fly from stored NP + FTP (no DB columns).
+- FTP stored per-ride (`rideFtpW`) so historical rides remain accurate.
+- PAS distribution is a separate table (not a column) — future-proof for different
+  e-bike systems with different PAS ranges.
+- PAS counts all samples (not just moving) — reflects total time at each level.
+- Motor energy computed at stop from sample timestamps.
+- Cadence zero-exclusion applies to both live and final computations.
 
 ## Known issues / TODO
 

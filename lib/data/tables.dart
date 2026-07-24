@@ -18,6 +18,34 @@ class Rides extends Table {
 
   /// User-editable name for the ride. Null/empty falls back to a date label.
   TextColumn get title => text().nullable()();
+
+  // -- v3 columns --
+
+  /// Weighted Average Power (more accurately, Normalized Power).
+  RealColumn get weightedAvgPowerW => real().nullable()();
+
+  /// Functional Threshold Power at the time this ride was recorded.
+  RealColumn get rideFtpW => real().nullable()();
+
+  /// Total motor energy used, in watt-hours.
+  RealColumn get motorEnergyWh => real().nullable()();
+}
+
+/// PAS level distribution for a ride.
+///
+/// One row per distinct PAS level present in the ride's samples.
+/// `sampleCount` is the number of telemetry ticks at that level (~1 Hz,
+/// so roughly equivalent to seconds).
+class PasLevelDistribution extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get rideId => integer().references(Rides, #id)();
+  IntColumn get pasLevel => integer()();
+  IntColumn get sampleCount => integer()();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {rideId, pasLevel},
+  ];
 }
 
 /// A single telemetry sample within a ride.

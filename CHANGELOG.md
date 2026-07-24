@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.2.0] — 2026-07-24 — Ride stats overhaul
+
+### Added
+- **Live ride stats**: Average Power, Normalized Power (WAP), and Average Cadence
+  tiles appear on the main ride screen during recording.
+- **Normalized Power (WAP)**: 30-second rolling average algorithm (Coggan/TrainingPeaks)
+  computed live during recording and finalized at stop.
+- **Intensity Factor (IF) & Training Stress Score (TSS)**: Computed from NP and
+  FTP, displayed on RideDetails.
+- **FTP setting**: Functional Threshold Power field on Settings page, persisted
+  via SharedPreferences (default 150 W).
+- **Ride FTP**: Editable FTP field on RideDetails, stored per-ride for historical
+  accuracy. Editing recomputes IF/TSS.
+- **Motor energy**: Total watt-hours consumed by the motor, computed at stop.
+- **PAS level distribution**: New `PasLevelDistribution` table recording time
+  spent at each assist level, displayed on RideDetails.
+- **Collapsible RideDetails**: Metrics grouped into Ride, Performance, Movement,
+  and Assistance sections with tap-to-toggle.
+- **Moving/stopped time**: Elapsed time broken into moving and stopped durations.
+- **Average speed & moving average speed**: Displayed on RideDetails.
+- **Cadence zero-exclusion**: Average cadence now excludes zero samples
+  (disconnected sensor) in both live and final computations.
+
+### Changed
+- `RecordingState` accumulators extended for live stats (power, cadence, PAS).
+- `_computeRideStats` computes NP via shared `NormalizedPowerCalculator`.
+- `Rides` table: added `weightedAvgPowerW`, `rideFtpW`, `motorEnergyWh` columns.
+- Database schema v3: new `PasLevelDistribution` table + migration.
+- Version: `1.1.0+1` → `1.2.0+1`.
+
+### Fixed
+- Average cadence no longer includes zero samples (disconnected sensor).
+
 ## [1.1.0] — 2026-07-24 — First stable release
 
 ### Added

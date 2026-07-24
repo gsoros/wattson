@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../ble/ble_service.dart';
 import '../ble/ble_scan_result.dart';
 import '../providers/ble_provider.dart';
+import '../providers/recording_provider.dart';
 import '../util/app_log.dart';
 import 'device_settings_dialog.dart';
 
@@ -55,6 +56,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ),
       body: Column(
         children: [
+          // -- FTP Settings --
+          _FtpSettingsCard(),
+          const Divider(height: 1),
           Expanded(
             child: scanResults.when(
               data: (devices) {
@@ -94,6 +98,87 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FTP Settings Card
+// ---------------------------------------------------------------------------
+
+class _FtpSettingsCard extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_FtpSettingsCard> createState() => _FtpSettingsCardState();
+}
+
+class _FtpSettingsCardState extends ConsumerState<_FtpSettingsCard> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final ftp = ref.read(ftpProvider);
+    _controller = TextEditingController(text: ftp.toString());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // Keep controller in sync if FTP changes externally.
+    ref.listen<int>(ftpProvider, (_, ftp) {
+      if (_controller.text != ftp.toString()) {
+        _controller.text = ftp.toString();
+      }
+    });
+
+    return Card(
+      margin: const EdgeInsets.all(12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.trending_up, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Functional Threshold Power', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text('Used to compute Intensity and TSS', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 80,
+              child: TextField(
+                controller: _controller,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  suffixText: 'W',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                ),
+                onSubmitted: (value) {
+                  final ftp = int.tryParse(value);
+                  if (ftp != null && ftp >= 50 && ftp <= 500) {
+                    ref.read(ftpProvider.notifier).setFtp(ftp);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

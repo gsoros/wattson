@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/database.dart';
 import '../data/recording_service.dart';
@@ -59,3 +60,29 @@ Stream<RecordingState> _withInitialState(RecordingService service) async* {
   yield service.currentState;
   yield* service.stateStream;
 }
+
+// ---------------------------------------------------------------------------
+// FTP (Functional Threshold Power)
+// ---------------------------------------------------------------------------
+
+/// Notifier that reads/writes the user's FTP from SharedPreferences.
+class _FtpNotifier extends Notifier<int> {
+  @override
+  int build() => 150; // default
+
+  /// Load FTP from SharedPreferences. Call once at startup.
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getInt('ftp_w') ?? 150;
+  }
+
+  /// Persist a new FTP value.
+  Future<void> setFtp(int ftp) async {
+    final clamped = ftp.clamp(50, 500);
+    state = clamped;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('ftp_w', clamped);
+  }
+}
+
+final ftpProvider = NotifierProvider<_FtpNotifier, int>(_FtpNotifier.new);

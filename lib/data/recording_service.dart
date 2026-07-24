@@ -9,9 +9,11 @@ import '../service/permission_service.dart';
 import '../data/database.dart';
 import '../util/app_log.dart';
 import '../util/ride_title_generator.dart';
+import '../util/normalized_power.dart';
 import '../models/recording_state.dart';
 import '../models/telemetry.dart';
 import '../service/recording_task_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Threshold below which the bike is considered stopped (km/h).
 const double _motionThreshold = 2.0;
@@ -26,6 +28,9 @@ class _RideStats {
     required this.avgCadenceRpm,
     required this.avgHrBpm,
     required this.assistRatio,
+    required this.weightedAvgPowerW,
+    required this.motorEnergyWh,
+    required this.pasLevelCounts,
   });
 
   final Value<double?> avgHumanPowerW;
@@ -34,6 +39,17 @@ class _RideStats {
   final Value<double?> avgCadenceRpm;
   final Value<double?> avgHrBpm;
   final Value<double?> assistRatio;
+
+  // -- v3 --
+
+  /// Normalized Power (30s rolling avg, stored as weightedAvgPowerW in DB).
+  final Value<double?> weightedAvgPowerW;
+
+  /// Total motor energy used, in watt-hours.
+  final Value<double?> motorEnergyWh;
+
+  /// PAS level distribution: level → sample count.
+  final Map<int, int> pasLevelCounts;
 }
 
 /// Manages ride recording lifecycle.
@@ -69,6 +85,9 @@ class RecordingService {
   bool _hasGps = false;
   DateTime? _tickStart;
 
+  // -- Normalized Power calculator (shared by live + batch) --
+  final NormalizedPowerCalculator _npCalc = NormalizedPowerCalculator();
+
   /// Called after every ride start or stop so the UI can refresh.
   VoidCallback? onRideMutation;
 
@@ -96,6 +115,7 @@ class RecordingService {
     // Emit recording state immediately so the UI swaps to pause/stop buttons
     // without waiting for the async setup below.
     _tickStart = DateTime.now();
+    _npCalc.reset();
     _state = _state.copyWith(status: RecordingStatus.recording, rideId: rideId);
     _stateController.add(_state);
 
@@ -174,7 +194,13 @@ class RecordingService {
       avgCadenceRpm: Value(stats.avgCadenceRpm.value),
       avgHrBpm: Value(stats.avgHrBpm.value),
       assistRatio: Value(stats.assistRatio.value),
+      weightedAvgPowerW: stats.weightedAvgPowerW,
+      motorEnergyWh: stats.motorEnergyWh,
     );
+
+    // Read current FTP from SharedPreferences.
+    final prefs = await SharedPreferences.getInstance();
+    final ftp = prefs.getInt('ftp_w') ?? 150;
 
     // Finalize the ride row.
     await (_db.update(_db.rides)..where((r) => r.id.equals(rideId!))).write(
@@ -189,10 +215,19 @@ class RecordingService {
         avgCadenceRpm: stats.avgCadenceRpm,
         avgHrBpm: stats.avgHrBpm,
         assistRatio: stats.assistRatio,
+        weightedAvgPowerW: stats.weightedAvgPowerW,
+        motorEnergyWh: stats.motorEnergyWh,
+        rideFtpW: Value(ftp.toDouble()),
         // Auto-generate a cheeky/motivational title unless one already exists.
         title: existing.title?.isNotEmpty == true ? const Value.absent() : Value(generateRideTitle(finalized)),
       ),
     );
+
+    // Write PAS level distribution rows.
+    for (final entry in stats.pasLevelCounts.entries) {
+      await _db.into(_db.pasLevelDistribution).insert(PasLevelDistributionCompanion.insert(rideId: rideId!, pasLevel: entry.key, sampleCount: entry.value));
+    }
+
     _log.d('ride #$rideId finalized in DB');
 
     // Reset specific state fields only
@@ -226,6 +261,9 @@ class RecordingService {
         avgCadenceRpm: Value(null),
         avgHrBpm: Value(null),
         assistRatio: Value(null),
+        weightedAvgPowerW: Value(null),
+        motorEnergyWh: Value(null),
+        pasLevelCounts: <int, int>{},
       );
     }
 
@@ -234,23 +272,41 @@ class RecordingService {
     double totalMotor = 0;
     double totalCadence = 0;
     double totalHr = 0;
+    double totalMotorEnergyWh = 0;
 
     int movingCount = 0;
     int validHrCount = 0;
+    int validCadenceCount = 0;
 
     // Track point-by-point assist ratios to get a true mathematical mean
     double totalAssistRatioShare = 0;
     int assistRatioCount = 0;
 
-    for (final s in samples) {
+    // PAS level distribution (all samples, not just moving)
+    final pasCounts = <int, int>{};
+
+    // Normalized Power via shared calculator
+    final npCalc = NormalizedPowerCalculator();
+
+    for (int i = 0; i < samples.length; i++) {
+      final s = samples[i];
+
+      // PAS distribution: count every sample regardless of motion
+      pasCounts[s.pasLevel] = (pasCounts[s.pasLevel] ?? 0) + 1;
+
       // 1. Enforce motion threshold across the board
       if (s.speedKmh <= _motionThreshold) continue;
       movingCount++;
 
-      // 2. Accumulate values over all moving samples (zeros included)
+      // 2. Accumulate values over all moving samples
       totalHuman += s.humanPowerW;
       totalMotor += s.motorPowerW;
-      totalCadence += s.cadenceRpm;
+
+      // Cadence: exclude zero samples
+      if (s.cadenceRpm > 0) {
+        totalCadence += s.cadenceRpm;
+        validCadenceCount++;
+      }
 
       if (s.humanPowerW > maxHuman) {
         maxHuman = s.humanPowerW;
@@ -262,34 +318,52 @@ class RecordingService {
         validHrCount++;
       }
 
-      // 4. Calculate individual sample assist share to protect math logic
+      // 4. Calculate individual sample assist share
       final double combinedPower = s.motorPowerW + s.humanPowerW;
       if (combinedPower > 0) {
         totalAssistRatioShare += (s.motorPowerW / combinedPower);
         assistRatioCount++;
       }
+
+      // 5. Motor energy: sum(motorPowerW × dt_hours)
+      if (i > 0) {
+        final dtHours = s.ts.difference(samples[i - 1].ts).inMilliseconds / 3600000.0;
+        totalMotorEnergyWh += s.motorPowerW * dtHours;
+      }
+
+      // 6. Feed the Normalized Power calculator
+      npCalc.addSample(s.humanPowerW);
     }
 
     // Handle case where samples exist but none passed the motion threshold
     if (movingCount == 0) {
-      return const _RideStats(
+      return _RideStats(
         avgHumanPowerW: Value(null),
         maxHumanPowerW: Value(null),
         avgMotorPowerW: Value(null),
         avgCadenceRpm: Value(null),
         avgHrBpm: Value(null),
         assistRatio: Value(null),
+        weightedAvgPowerW: Value(null),
+        motorEnergyWh: Value(null),
+        pasLevelCounts: pasCounts,
       );
     }
 
-    // 5. Divide safely using standard drift-free denominators
+    // 7. Read NP from the calculator
+    final np = npCalc.normalizedPower ?? 0;
+
+    // 8. Divide safely using standard drift-free denominators
     return _RideStats(
       avgHumanPowerW: Value(totalHuman / movingCount),
       maxHumanPowerW: Value(maxHuman),
       avgMotorPowerW: Value(totalMotor / movingCount),
-      avgCadenceRpm: Value(totalCadence / movingCount),
+      avgCadenceRpm: Value(validCadenceCount > 0 ? totalCadence / validCadenceCount : null),
       avgHrBpm: Value(validHrCount > 0 ? totalHr / validHrCount : null),
       assistRatio: Value(assistRatioCount > 0 ? totalAssistRatioShare / assistRatioCount : null),
+      weightedAvgPowerW: Value(np),
+      motorEnergyWh: Value(totalMotorEnergyWh),
+      pasLevelCounts: pasCounts,
     );
   }
 
@@ -304,6 +378,7 @@ class RecordingService {
     _log.d('deleting ride #$rideId and its samples');
     await _db.transaction(() async {
       await (_db.delete(_db.samples)..where((s) => s.rideId.equals(rideId))).go();
+      await (_db.delete(_db.pasLevelDistribution)..where((p) => p.rideId.equals(rideId))).go();
       await (_db.delete(_db.rides)..where((r) => r.id.equals(rideId))).go();
     });
     _log.d('ride #$rideId deleted');
@@ -390,8 +465,15 @@ class RecordingService {
           avgCadenceRpm: stats.avgCadenceRpm,
           avgHrBpm: stats.avgHrBpm,
           assistRatio: stats.assistRatio,
+          weightedAvgPowerW: stats.weightedAvgPowerW,
+          motorEnergyWh: stats.motorEnergyWh,
         ),
       );
+
+      // Write PAS level distribution rows.
+      for (final entry in stats.pasLevelCounts.entries) {
+        await _db.into(_db.pasLevelDistribution).insert(PasLevelDistributionCompanion.insert(rideId: ride.id, pasLevel: entry.key, sampleCount: entry.value));
+      }
     }
   }
 
@@ -439,6 +521,31 @@ class RecordingService {
       _prevElevation = _lastElevation;
     }
 
+    // -- Live stats accumulators --
+    int movingDelta = 0;
+    double humanPowerDelta = 0;
+    double cadenceDelta = 0;
+    int cadenceCountDelta = 0;
+    double motorPowerDelta = 0;
+    final pasCounts = Map<int, int>.from(_state.pasLevelCounts);
+
+    if (t.speedKmh > _motionThreshold) {
+      movingDelta = 1;
+      humanPowerDelta = t.humanPowerW;
+      motorPowerDelta = t.motorPowerW;
+
+      // Feed the Normalized Power calculator on moving samples.
+      _npCalc.addSample(t.humanPowerW);
+
+      if (t.cadenceRpm > 0) {
+        cadenceDelta = t.cadenceRpm.toDouble();
+        cadenceCountDelta = 1;
+      }
+    }
+
+    // PAS distribution: count every sample regardless of motion.
+    pasCounts[t.pasLevel] = (pasCounts[t.pasLevel] ?? 0) + 1;
+
     // Update state accumulators.
     _state = _state.copyWith(
       status: RecordingStatus.recording,
@@ -446,6 +553,13 @@ class RecordingService {
       timeInMotion: _state.timeInMotion + motionDelta,
       distanceKm: _state.distanceKm + distanceDelta,
       elevationGainM: _state.elevationGainM + elevationDelta,
+      movingSampleCount: _state.movingSampleCount + movingDelta,
+      totalHumanPower: _state.totalHumanPower + humanPowerDelta,
+      totalCadence: _state.totalCadence + cadenceDelta,
+      cadenceSampleCount: _state.cadenceSampleCount + cadenceCountDelta,
+      totalMotorPower: _state.totalMotorPower + motorPowerDelta,
+      pasLevelCounts: pasCounts,
+      normalizedPower: _npCalc.normalizedPower,
     );
     _stateController.add(_state);
 

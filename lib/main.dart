@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/map_config.dart';
 import 'providers/ble_provider.dart';
+import 'providers/recording_provider.dart';
 import 'ui/main_page.dart';
 import 'util/app_log.dart';
 
@@ -48,6 +49,9 @@ class WattsonApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Trigger auto-connect on app start.
     ref.read(autoConnectProvider);
+
+    // Load persisted FTP value.
+    ref.read(ftpProvider.notifier).load();
 
     return MaterialApp(
       title: 'Wattson',
