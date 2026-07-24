@@ -120,22 +120,24 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              // Draw feeback only while the user is holding.
-              if (_controller.value > 0)
-                // Large, obvious ring
-                SizedBox(
-                  width: 512,
-                  height: 512,
-                  child: AnimatedBuilder(
-                    animation: _controller,
-                    builder: (context, _) => CircularProgressIndicator(
+              // Always in the tree so AnimatedBuilder listens from tick 0.
+              // The ring is hidden via SizedBox.shrink when not active.
+              SizedBox(
+                width: 512,
+                height: 512,
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) {
+                    if (_controller.value == 0) return const SizedBox.shrink();
+                    return CircularProgressIndicator(
                       value: _controller.value,
                       strokeWidth: 64,
                       backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(128),
                       valueColor: AlwaysStoppedAnimation(widget.iconColor),
-                    ),
-                  ),
+                    );
+                  },
                 ),
+              ),
               /*
               // Cyclist animation drawn across full screen while holding.
               // Positioned + OverflowBox lets the CustomPaint escape the 52×52
