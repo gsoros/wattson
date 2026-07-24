@@ -62,7 +62,7 @@ class _MapSettingsState extends State<MapSettings> {
       runSpacing: 0,
       borderRadius: 0,
       wheelDiameter: 165,
-      enableOpacity: false,
+      enableOpacity: true,
       pickersEnabled: const <ColorPickerType, bool>{
         ColorPickerType.both: false,
         ColorPickerType.primary: true,
