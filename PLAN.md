@@ -285,29 +285,34 @@ samples(ride_id FK INDEX, ts, lat, lon, elevation, speed, human_power, motor_pow
 ## Phase 9 — Testing
 
 - `MockBleService` drives UI/recording/export without hardware.
-- Unit tests: `CtsParser` (every field, signed PAS, version mismatch), Drift
-  aggregations, GPX/CSV serializers.
+- Unit tests: `CtsParser` (every field, signed PAS, version mismatch), Drift aggregations, GPX/CSV serializers.
 - Widget tests for ride + config screens.
 
 ## Milestones
 
-| M | Deliverable |
-|---|---|
+| M | Deliverable | Status |
+|---|---|---|
 | M0 | Scaffold + `BleService` interface + `MockBleService` | **DONE** |
 | M1 | Single Dash connection + CTS parser (live values) | **DONE** |
 | M2 | Multi-device BLE (Dash + HRM) + settings page + auto-connect | **DONE** |
 | M3 | Live display (ride screen, 2-column layout, battery bar) | **DONE** |
 | M4 | Recording (Drift DB, RecordingService, start/pause/stop, GPS) | **DONE** |
 | M5 | Foreground service + background recording | **DONE** |
-| M6 | Export (GPX + share_plus; CSV deferred) | **GPX DONE** |
+| M6 | Export (GPX + share_plus; CSV **DEFERRED**) | **DONE** |
 | M6b | Ride details, map, and graphs (flutter_map, OpenCycleMap/OSM) | **DONE** |
-| M6c | Navigation + UX polish: pure Navigator (drop PageView), swipe gestures, full-screen mode, REC indicator, custom launcher icon, bundle id `org.gsoros.wattson` | **DONE (2026-07-20)** |
-| M7 | Device config (Wi-Fi, hostname, etc. via NUS) | **DONE (2026-07-21)** |
-| M8 | Permissions **DONE**, iOS pass **DEFERRED**, tests, polish **IN PROGRESS** |
+| M6c | Navigation + UX polish: pure Navigator (drop PageView), swipe gestures, full-screen mode, REC indicator, custom launcher icon, bundle id `org.gsoros.wattson` | **DONE** |
+| M7 | Device config (Wi-Fi, hostname, etc. via NUS) | **DONE** |
+| M8 | Permissions, iOS pass **DEFERRED**, tests **DEFERRED**, polish | **DONE** |
 
 **Firmware dependencies:** M1 needs NUS only for config (M7); M2's push-to-Dash
 needs the HR write char. Both firmware tasks are DONE. Protocol spec written as
 `docs/protocol.md` in the ORD source tree.
+
+## v1.1.0 — First stable release (2026-07-24)
+
+- Version bumped from `1.0.0+1` to `1.1.0+1` in `pubspec.yaml`.
+- All milestones M0–M8 complete. App is stable for daily use.
+- `CHANGELOG.md` created.
 
 ## Known issues / TODO
 
