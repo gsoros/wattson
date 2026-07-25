@@ -9,6 +9,7 @@ import '../providers/recording_provider.dart';
 import 'ride_history_page.dart';
 import 'settings_page.dart';
 import 'hold_to_confirm_button.dart';
+import '../util/app_log.dart';
 
 /// Live ride screen
 ///
@@ -126,6 +127,9 @@ class MainPage extends ConsumerWidget {
 class _FullScreenPage extends ConsumerWidget {
   const _FullScreenPage();
 
+  /// ignore: unused_field
+  static final _log = AppLog.logFor('FullScreenPage');
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashState = ref.watch(dashConnectionStateProvider);
@@ -133,28 +137,26 @@ class _FullScreenPage extends ConsumerWidget {
     final telemetry = ref.watch(telemetryProvider);
     final connected = dashState.value == BleConnectionState.connected || hrmState.value == BleConnectionState.connected;
 
+    // Account for the status bar since we're not using SafeArea.
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       body: GestureDetector(
         // Double tap to exit full-screen mode.
         onDoubleTap: () => Navigator.of(context).pop(),
-        child: SafeArea(
-          child: !connected
-              ? const Center(child: Text('No data — connect a device'))
-              : telemetry.when(
-                  data: (t) => _RideContent(t: t, bottomPadding: 0),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Telemetry error: $e')),
-                ),
-        ),
+        child: !connected
+            ? const Center(child: Text('No data — connect a device'))
+            : telemetry.when(
+                data: (t) => _RideContent(t: t, topPadding: topPadding, bottomPadding: 0.0),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Telemetry error: $e')),
+              ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Recording control bar
-// ---------------------------------------------------------------------------
-
+/// Recording control bar
 class _RecordingControlBar extends ConsumerWidget {
   const _RecordingControlBar({required this.rs, required this.canRecord});
   final RecordingState rs;
@@ -260,8 +262,14 @@ class _RecordingControlBar extends ConsumerWidget {
 
 /// The inner content so we can use non-const keys on the cards.
 class _RideContent extends ConsumerWidget {
-  const _RideContent({required this.t, this.bottomPadding = 120});
+  const _RideContent({required this.t, this.topPadding = 8, this.bottomPadding = 120});
   final Telemetry t;
+
+  /// ignore: unused_field
+  static final _log = AppLog.logFor('RideContent');
+
+  /// Top padding for the list. Defaults to 8.
+  final double topPadding;
 
   /// Bottom padding for the list. Defaults to 120 to clear the recording
   /// controls bar on the main page; set to 0 in full-screen mode where the
@@ -358,13 +366,12 @@ class _RideContent extends ConsumerWidget {
 
     return metrics.isEmpty || (!t.ordValid && !t.hrmValid)
         ? const Center(child: Text('Waiting for data  ...'))
-        : ListView(padding: EdgeInsets.fromLTRB(0, 8, 0, bottomPadding), children: metrics);
+        : ListView(padding: EdgeInsets.fromLTRB(0, topPadding, 0, bottomPadding), children: metrics);
   }
 
   double _gridChildWidth(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
     // 2 columns with 8px gaps and 12px side padding
-    return (width - 12 * 2 - 8) / 2;
+    return (MediaQuery.of(context).size.width - 12 * 2 - 8) / 2;
   }
 }
 
