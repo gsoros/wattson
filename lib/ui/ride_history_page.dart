@@ -6,12 +6,12 @@ import '../providers/recording_provider.dart';
 import '../util/app_log.dart';
 import 'ride_details_page.dart';
 
+final _log = AppLog.logFor('RideHistory');
+
 /// All rides from the database, ordered by start time descending.
 ///
 /// Re-fetches whenever [rideHistoryVersionProvider] is bumped (on every ride
 /// start or stop).
-final _log = AppLog.logFor('RideHistory');
-
 final rideHistoryProvider = FutureProvider<List<Ride>>((ref) async {
   // Watch the version counter so this provider re-evaluates on start/stop.
   ref.watch(rideHistoryVersionProvider);
