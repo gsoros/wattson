@@ -102,7 +102,12 @@ class _RideCard extends StatelessWidget {
         onTap: () {
           // The ride currently "in progress" (endTime == null) is not opened.
           if (ride.endTime == null) return;
-          Navigator.of(context).push(_scaleRoute(RideDetailsPage(ride: ride)));
+
+          // Capture the card's center position on screen for the transition origin.
+          final box = context.findRenderObject() as RenderBox?;
+          final Offset? cardCenter = box?.localToGlobal(box!.size.center(Offset.zero));
+
+          Navigator.of(context).push(_scaleRoute(RideDetailsPage(ride: ride), origin: cardCenter));
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -200,16 +205,33 @@ class _Stat extends StatelessWidget {
   }
 }
 
-/// A route that scales the page up from the center on push and scales it back
-/// down on pop, giving a subtle zoom-in / zoom-out effect.
-Route<T> _scaleRoute<T>(Widget page) {
+/// A route that scales the page up from the tapped card's position on push and
+/// scales it back down on pop, giving a subtle zoom-in / zoom-out effect.
+///
+/// If [origin] is provided, the scale originates from that screen position
+/// rather than the center of the screen.
+Route<T> _scaleRoute<T>(Widget page, {Offset? origin}) {
   return PageRouteBuilder<T>(
     pageBuilder: (context, animation, secondaryAnimation) => page,
-    transitionDuration: const Duration(milliseconds: 500),
-    reverseTransitionDuration: const Duration(milliseconds: 500),
+    transitionDuration: const Duration(milliseconds: 350),
+    reverseTransitionDuration: const Duration(milliseconds: 350),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final scale = Tween<double>(begin: 0.5, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)).animate(animation);
-      final fade = Tween<double>(begin: 0.0, end: 1.0).animate(animation);
+      final scale = Tween<double>(begin: 0.2, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)).animate(animation);
+      final fade = Tween<double>(begin: 0.2, end: 1.0).animate(animation);
+
+      if (origin != null) {
+        // Convert the card's screen position to an Alignment (-1..1) so
+        // ScaleTransition pivots from the tapped card instead of screen center.
+        final screenSize = MediaQuery.of(context).size;
+        final alignX = (origin.dx / (screenSize.width / 2)) - 1.0;
+        final alignY = (origin.dy / (screenSize.height / 2)) - 1.0;
+
+        return FadeTransition(
+          opacity: fade,
+          child: ScaleTransition(scale: scale, alignment: Alignment(alignX, alignY), child: child),
+        );
+      }
+
       return FadeTransition(
         opacity: fade,
         child: ScaleTransition(scale: scale, child: child),
