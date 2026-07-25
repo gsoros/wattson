@@ -10,7 +10,7 @@ import 'ride_history_page.dart';
 import 'settings_page.dart';
 import 'hold_to_confirm_button.dart';
 
-/// Live ride screen (Phase 4).
+/// Live ride screen
 ///
 /// Shows ORD Dash telemetry and HRM heart rate in a clean card layout, with
 /// recording controls at the bottom.
@@ -327,8 +327,9 @@ class _RideContent extends ConsumerWidget {
 
     // -- Trip stats (shown while recording) --
     if (rs != null && rs.isActive) {
-      metrics.add(_TripStatsTile(status: rs.status, elapsed: rs.elapsed, distanceKm: rs.distanceKm, elevationGainM: rs.elevationGainM));
+      metrics.add(_TripStatsTile(rs: rs));
 
+      /*
       // -- Live ride stats (shown while recording, below trip stats) --
       final liveTiles = <Widget>[];
       if (rs.avgHumanPowerW != null) {
@@ -352,6 +353,7 @@ class _RideContent extends ConsumerWidget {
           ),
         );
       }
+      */
     }
 
     return metrics.isEmpty || (!t.ordValid && !t.hrmValid)
@@ -366,53 +368,90 @@ class _RideContent extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Trip stats tile (shown while recording)
-// ---------------------------------------------------------------------------
-
 class _TripStatsTile extends StatelessWidget {
-  const _TripStatsTile({required this.status, required this.elapsed, required this.distanceKm, required this.elevationGainM});
-  final RecordingStatus status;
-  final Duration elapsed;
-  final double distanceKm;
-  final double elevationGainM;
+  const _TripStatsTile({required this.rs});
+  final RecordingState rs;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    final liveStats = <Widget>[];
+    if (rs.avgHumanPowerW != null) {
+      liveStats.add(_TripStat(theme: theme, label: 'Avg. Power', value: rs.avgHumanPowerW!.toStringAsFixed(0), unit: 'W'));
+    }
+    if (rs.normalizedPower != null) {
+      liveStats.add(_TripStat(theme: theme, label: 'WAP', value: rs.normalizedPower!.toStringAsFixed(0), unit: 'W'));
+    }
+    if (rs.avgCadenceRpm != null) {
+      liveStats.add(_TripStat(theme: theme, label: 'Avg.Cadence', value: rs.avgCadenceRpm!.toStringAsFixed(0), unit: 'RPM'));
+    }
+
+    final rows = <Widget>[
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _RecordingStatusIndicator(status: rs.status, theme: theme),
+          _TripStat(theme: theme, label: 'Time', value: _timeFormat(rs.elapsed)),
+          _TripStat(theme: theme, label: 'Distance', value: rs.distanceKm.toStringAsFixed(1), unit: 'km'),
+          _TripStat(theme: theme, label: 'Climb', value: rs.elevationGainM.toStringAsFixed(0), unit: 'm'),
+        ],
+      ),
+    ];
+    if (liveStats.isNotEmpty) {
+      rows.add(const SizedBox(height: 8));
+      rows.add(Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: liveStats));
+    }
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            // Recording indicator: red dot + "REC" when recording,
-            // orange blinking dot + "PAUSED" when paused.
-            switch (status) {
-              RecordingStatus.paused => _PauseIndicator(theme: theme),
-              _ => Column(
-                children: [
-                  Icon(Icons.fiber_manual_record, color: Colors.red, size: 18),
-                  Text('REC', style: theme.textTheme.labelSmall?.copyWith(color: Colors.red)),
-                ],
-              ),
-            },
-            _Stat(theme: theme, label: 'Time', value: _fmt(elapsed)),
-            _Stat(theme: theme, label: 'Distance', value: '${distanceKm.toStringAsFixed(1)} km'),
-            _Stat(theme: theme, label: 'Climb', value: '${elevationGainM.toStringAsFixed(0)} m'),
-          ],
-        ),
+        child: Column(children: rows),
       ),
     );
   }
 
-  String _fmt(Duration d) {
+  String _timeFormat(Duration d) {
     final h = d.inHours;
     final m = d.inMinutes.remainder(60);
     final s = d.inSeconds.remainder(60);
-    if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
-    return '${m}m ${s.toString().padLeft(2, '0')}s';
+    if (h > 0) return '$h:${m.toString().padLeft(2, '0')}';
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+}
+
+/// Recording status indicator
+class _RecordingStatusIndicator extends StatelessWidget {
+  const _RecordingStatusIndicator({required this.status, required this.theme});
+  final RecordingStatus status;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    // Red dot + "REC" when recording,
+    // orange blinking dot + "PAUSED" when paused.
+    // grey dot + "IDLE" when idle.
+    switch (status) {
+      case RecordingStatus.paused:
+        return _PauseIndicator(theme: theme);
+      case RecordingStatus.recording:
+        return Column(
+          children: [
+            Icon(Icons.fiber_manual_record, color: Colors.red, size: 18),
+            Text('REC', style: theme.textTheme.labelSmall?.copyWith(color: Colors.red)),
+          ],
+        );
+      default:
+        return Column(
+          children: [
+            Icon(Icons.fiber_manual_record, color: Colors.grey, size: 18),
+            Text('IDLE', style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey)),
+          ],
+        );
+    }
   }
 }
 
@@ -455,27 +494,35 @@ class _PauseIndicatorState extends State<_PauseIndicator> with SingleTickerProvi
   }
 }
 
-class _Stat extends StatelessWidget {
-  const _Stat({required this.theme, required this.label, required this.value});
+/// A single stat (label + value + unit) in the trip stats bar.
+class _TripStat extends StatelessWidget {
+  const _TripStat({required this.theme, required this.label, required this.value, this.unit});
   final ThemeData theme;
   final String label;
   final String value;
+  final String? unit;
 
   @override
   Widget build(BuildContext context) {
+    final valueWithUnit = <Widget>[Text(value, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600))];
+    if (unit != null) {
+      valueWithUnit.addAll([
+        const SizedBox(width: 4),
+        Text(unit!, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
+      ]);
+    }
+
     return Column(
       children: [
-        Text(value, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: valueWithUnit),
+
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
       ],
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Speed hero tile
-// ---------------------------------------------------------------------------
-
+/// Speed hero tile
 class _SpeedTile extends StatelessWidget {
   const _SpeedTile({required this.speedKmh});
   final double speedKmh;
@@ -508,11 +555,11 @@ class _SpeedTile extends StatelessWidget {
               ),
               Align(
                 alignment: Alignment.bottomLeft,
-                child: Text('Speed', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                child: Text('Speed', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
               ),
               Align(
                 alignment: Alignment.bottomRight,
-                child: Text('km/h', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                child: Text('km/h', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
               ),
             ],
           ),
@@ -522,10 +569,7 @@ class _SpeedTile extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Secondary metric tile (used in the 2-column grid)
-// ---------------------------------------------------------------------------
-
+/// Secondary metric tile (used in the 2-column grid)
 class _MetricTile extends StatelessWidget {
   const _MetricTile({required this.label, required this.value, required this.unit});
   final String label;
@@ -560,12 +604,12 @@ class _MetricTile extends StatelessWidget {
               ),
               Align(
                 alignment: Alignment.bottomLeft,
-                child: Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                child: Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
               ),
               if (unit.isNotEmpty)
                 Align(
                   alignment: Alignment.bottomRight,
-                  child: Text(unit, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  child: Text(unit, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
                 ),
             ],
           ),
@@ -575,10 +619,7 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Battery tile (SoC bar + voltage)
-// ---------------------------------------------------------------------------
-
+/// Battery tile (SoC bar + voltage)
 class _BatteryTile extends StatelessWidget {
   const _BatteryTile({required this.soc, required this.voltage});
   final int soc;
@@ -595,13 +636,6 @@ class _BatteryTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Battery', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                Text('${voltage.toStringAsFixed(1)} V', style: theme.textTheme.bodySmall),
-              ],
-            ),
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
@@ -613,7 +647,14 @@ class _BatteryTile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text('$soc%', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Battery', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
+                Text('$soc%', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                Text('${voltage.toStringAsFixed(1)} V', style: theme.textTheme.bodySmall),
+              ],
+            ),
           ],
         ),
       ),
