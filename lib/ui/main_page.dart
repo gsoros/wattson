@@ -385,7 +385,7 @@ class _TripStatsTile extends StatelessWidget {
       liveStats.add(_TripStat(theme: theme, label: 'WAP', value: rs.normalizedPower!.toStringAsFixed(0), unit: 'W'));
     }
     if (rs.avgCadenceRpm != null) {
-      liveStats.add(_TripStat(theme: theme, label: 'Avg.Cadence', value: rs.avgCadenceRpm!.toStringAsFixed(0), unit: 'RPM'));
+      liveStats.add(_TripStat(theme: theme, label: 'Avg. Cadence', value: rs.avgCadenceRpm!.toStringAsFixed(0), unit: 'RPM'));
     }
 
     final rows = <Widget>[
@@ -648,11 +648,15 @@ class _BatteryTile extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Text('Battery', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
-                Text('$soc%', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-                Text('${voltage.toStringAsFixed(1)} V', style: theme.textTheme.bodySmall),
+                Expanded(child: const SizedBox()),
+                Text(soc.toString(), style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                Text(' %', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
+                Expanded(child: const SizedBox()),
+                Text(voltage.toStringAsFixed(1), style: theme.textTheme.bodySmall),
+                Text(' V', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(128))),
               ],
             ),
           ],
