@@ -427,10 +427,7 @@ class _RideDetailsPageState extends ConsumerState<RideDetailsPage> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Collapsible section header
-// ---------------------------------------------------------------------------
-
+/// Collapsible section header
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title, required this.expanded, required this.onToggle});
   final String title;
@@ -463,10 +460,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Metric row
-// ---------------------------------------------------------------------------
-
+/// Metric row
 class _MetricRow extends StatelessWidget {
   const _MetricRow({required this.icon, required this.label, required this.value});
   final IconData icon;
@@ -490,10 +484,7 @@ class _MetricRow extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// PAS level row (time spent at each level)
-// ---------------------------------------------------------------------------
-
+/// PAS level row (time spent at each level)
 class _PasLevelRow extends StatelessWidget {
   const _PasLevelRow({required this.pasLevel, required this.sampleCount});
   final int pasLevel;

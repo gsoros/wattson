@@ -81,10 +81,7 @@ class RideHistoryPage extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Ride card
-// ---------------------------------------------------------------------------
-
+/// Ride card
 class _RideCard extends StatelessWidget {
   const _RideCard({required this.ride});
   final Ride ride;
@@ -176,6 +173,7 @@ class _RideCard extends StatelessWidget {
   }
 }
 
+/// Stat: icon + label + value
 class _Stat extends StatelessWidget {
   const _Stat({required this.icon, required this.label, required this.value});
   final IconData icon;
@@ -207,10 +205,10 @@ class _Stat extends StatelessWidget {
 Route<T> _scaleRoute<T>(Widget page) {
   return PageRouteBuilder<T>(
     pageBuilder: (context, animation, secondaryAnimation) => page,
-    transitionDuration: const Duration(milliseconds: 250),
-    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionDuration: const Duration(milliseconds: 500),
+    reverseTransitionDuration: const Duration(milliseconds: 500),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final scale = Tween<double>(begin: 0.92, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)).animate(animation);
+      final scale = Tween<double>(begin: 0.5, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)).animate(animation);
       final fade = Tween<double>(begin: 0.0, end: 1.0).animate(animation);
       return FadeTransition(
         opacity: fade,

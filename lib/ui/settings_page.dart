@@ -9,7 +9,10 @@ import '../util/app_log.dart';
 import 'device_settings_dialog.dart';
 
 /// Settings page.
-/// For now the only setting is the device list: BLE scan results with connect/disconnect controls.
+///
+/// For now the only two settings are:
+/// - FTP
+/// - device list: BLE scan results with connect/disconnect controls
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -40,7 +43,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('BLE Devices'), // We can rename this to "Settings" when we add more settings.
+        title: const Text('Settings'),
         actions: [
           IconButton(icon: const Icon(Icons.bug_report), tooltip: 'Share diagnostic log', onPressed: () => AppLog.share()),
           IconButton(
@@ -59,6 +62,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           // -- FTP Settings --
           _FtpSettingsCard(),
           const Divider(height: 1),
+          const SizedBox(height: 8),
+          Text('BLE Devices', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
           Expanded(
             child: scanResults.when(
               data: (devices) {
@@ -103,10 +109,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// FTP Settings Card
-// ---------------------------------------------------------------------------
-
+/// FTP Settings Card
 class _FtpSettingsCard extends ConsumerStatefulWidget {
   @override
   ConsumerState<_FtpSettingsCard> createState() => _FtpSettingsCardState();
@@ -184,6 +187,7 @@ class _FtpSettingsCardState extends ConsumerState<_FtpSettingsCard> {
   }
 }
 
+/// BLE Device Card
 class _DeviceCard extends ConsumerStatefulWidget {
   const _DeviceCard({super.key, required this.device});
   final BleScanResult device;

@@ -117,10 +117,8 @@ class MainPage extends ConsumerWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Full-screen (distraction-free) metrics view
-// ---------------------------------------------------------------------------
-
+/// Full-screen (distraction-free) metrics view.
+///
 /// Shows the same metrics and trip stats as [MainPage] but without the
 /// [AppBar] or the recording controls bar. Exit via the system back gesture
 /// or a double tap.
@@ -336,32 +334,6 @@ class _RideContent extends ConsumerWidget {
     // -- Trip stats (shown while recording) --
     if (rs != null && rs.isActive) {
       metrics.add(_TripStatsTile(rs: rs));
-
-      /*
-      // -- Live ride stats (shown while recording, below trip stats) --
-      final liveTiles = <Widget>[];
-      if (rs.avgHumanPowerW != null) {
-        liveTiles.add(_MetricTile(label: 'Avg Power', value: rs.avgHumanPowerW!.toStringAsFixed(0), unit: 'W'));
-      }
-      if (rs.normalizedPower != null) {
-        liveTiles.add(_MetricTile(label: 'WAP', value: rs.normalizedPower!.toStringAsFixed(0), unit: 'W'));
-      }
-      if (rs.avgCadenceRpm != null) {
-        liveTiles.add(_MetricTile(label: 'Avg Cadence', value: rs.avgCadenceRpm!.toStringAsFixed(0), unit: 'RPM'));
-      }
-      if (liveTiles.isNotEmpty) {
-        metrics.add(
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12.0, 0, 12.0, 0),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: liveTiles.map((child) => SizedBox(width: _gridChildWidth(context), child: child)).toList(),
-            ),
-          ),
-        );
-      }
-      */
     }
 
     return metrics.isEmpty || (!t.ordValid && !t.hrmValid)
