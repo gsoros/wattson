@@ -8,8 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 /// Lightweight, structured on-device logging used to capture crash/diagnostic
-/// output across sessions (e.g. to reproduce the out-of-BLE-range crash from
-/// the 2026-07-20 ride).
+/// output across sessions.
 ///
 /// Built on the `logger` package:
 /// - every log line automatically includes the **caller class + file:line**

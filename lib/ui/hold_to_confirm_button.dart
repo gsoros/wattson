@@ -4,15 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../util/app_log.dart';
 
-// ---------------------------------------------------------------------------
-// Hold-to-confirm button
-// ---------------------------------------------------------------------------
-//
-// Used for destructive / easy-to-miss actions (pause, stop, resume) so they
-// can't be triggered by an accidental tap. The user must press and hold; an
-// indicator fills over ~2.5 s and the action only fires once the indicator
-// completes. Releasing early cancels.
-
+/// Hold-to-confirm button
+///
+/// Used for destructive / easy-to-miss actions (pause, stop, resume) so they
+/// can't be triggered by an accidental tap. The user must press and hold; an
+/// indicator fills over ~2.5 s and the action only fires once the indicator
+/// completes. Releasing early cancels.
 class HoldToConfirmButton extends StatefulWidget {
   const HoldToConfirmButton({
     required Key key,
@@ -167,10 +164,9 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton> with SingleTi
   }
 }
 
-// ---------------------------------------------------------------------------
-// Cyclist painter (stick figure riding across screen)
-// Work-in-progress: not yet used.
-// ---------------------------------------------------------------------------
+/// Cyclist painter (stick figure riding across screen).
+///
+/// Work-in-progress: not yet used.
 // ignore: unused_element
 class _CyclistPainter extends CustomPainter {
   _CyclistPainter({

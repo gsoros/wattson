@@ -105,7 +105,7 @@ class _RideCard extends StatelessWidget {
 
           // Capture the card's center position on screen for the transition origin.
           final box = context.findRenderObject() as RenderBox?;
-          final Offset? cardCenter = box?.localToGlobal(box!.size.center(Offset.zero));
+          final Offset? cardCenter = box?.localToGlobal(box.size.center(Offset.zero));
 
           Navigator.of(context).push(_scaleRoute(RideDetailsPage(ride: ride), origin: cardCenter));
         },
