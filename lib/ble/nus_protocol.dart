@@ -98,7 +98,7 @@ class NusReply {
   /// Returns `null` if the string does not match the expected format.
   static NusReply? parse(String raw) {
     // Format: API [<command>[ <args>]] (<code>) <data>
-    final regex = RegExp(r'^API \[(.*?)\] \((\w+(?: \w+)?)\) (.*)$');
+    final regex = RegExp(r'^API \[(.*?)\] \((\w+(?: \w+)?)\) (.*)$', dotAll: true);
     final match = regex.firstMatch(raw.trim());
     if (match == null) return null;
 

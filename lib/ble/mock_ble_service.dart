@@ -53,6 +53,12 @@ class MockBleService implements BleService {
   Stream<Telemetry> get telemetry => _telemetryController.stream;
 
   @override
+  Stream<String>? get debugMessages => null; // no debug service in mock
+
+  @override
+  bool get debugServiceAvailable => false;
+
+  @override
   bool get isScanning => _scanning;
 
   @override

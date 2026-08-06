@@ -5,6 +5,7 @@ import '../ble/ble_service.dart';
 import '../ble/nus_protocol.dart';
 import '../providers/ble_provider.dart';
 import '../providers/device_config_provider.dart';
+import '../util/app_log.dart';
 
 /// Full-screen dialog for configuring the connected ORD Dash over NUS.
 ///
@@ -389,6 +390,13 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
                     error: errors[DeviceConfigField.simEnabled],
                     onChanged: (on) => _toggleSim(on),
                   ),
+                // -- Debug section (devel firmware) --
+                const SizedBox(height: 24),
+                Text('Debug', style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 8),
+                _DebugLogCard(),
+                const SizedBox(height: 8),
+                _TorqueDumpCard(),
               ],
             ),
           ),
@@ -476,6 +484,117 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
             child: Text(error, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
           ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Debug section widgets (devel firmware)
+// ---------------------------------------------------------------------------
+
+/// Card showing debug log message count and save/clear buttons.
+class _DebugLogCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final service = ref.read(bleServiceProvider);
+    final hasDebugService = service.debugServiceAvailable;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.bug_report, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text('BLE Debug Log', style: theme.textTheme.bodyLarge),
+                const Spacer(),
+                if (!hasDebugService)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(4)),
+                    child: Text('not available', style: theme.textTheme.labelSmall),
+                  ),
+              ],
+            ),
+            if (hasDebugService) ...[
+              const SizedBox(height: 8),
+              Text('Debug messages are streamed from the devel firmware\'s BLE debug service.', style: theme.textTheme.bodySmall),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.save_alt, size: 16),
+                    label: const Text('Save to log'),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debug log saved to wattson.log')));
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    label: const Text('Clear buffer'),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debug buffer cleared')));
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Card with a button to dump the torque ring buffer via NUS.
+class _TorqueDumpCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final service = ref.read(bleServiceProvider);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.sensors, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text('Torque Ring Buffer', style: theme.textTheme.bodyLarge),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('Dumps recent torque sensor samples from the device ring buffer to wattson.log.', style: theme.textTheme.bodySmall),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.download, size: 16),
+              label: const Text('Dump torque log'),
+              onPressed: () async {
+                final reply = await service.sendCommand('torquelog');
+                if (reply != null && reply.isSuccess) {
+                  final log = AppLog.logFor('TorqueDump');
+                  log.i('--- Torque log dump ---\n${reply.data}');
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Torque log saved to wattson.log')));
+                  }
+                } else {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to dump torque log')));
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -29,6 +29,13 @@ abstract class BleService {
   /// Combined telemetry stream (CTS data from Dash + HR from HRM).
   Stream<Telemetry> get telemetry;
 
+  /// Debug log messages from the devel firmware's BLE debug service.
+  /// Only yields messages while the connected Dash exposes the debug service.
+  Stream<String>? get debugMessages;
+
+  /// Whether the connected Dash actually has the debug BLE service available.
+  bool get debugServiceAvailable;
+
   /// Whether BLE is enabled on the device.
   Future<bool> isEnabled();
 

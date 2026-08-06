@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +14,10 @@ import 'cts_parser.dart';
 import 'nus_command_queue.dart';
 import 'nus_protocol.dart';
 import 'telemetry_store.dart';
+
+/// Debug BLE service UUIDs (devel firmware only).
+const String kDebugServiceUuid = 'ad832eae-54b6-4a81-bb49-3125ec77324b';
+const String kDebugLogCharUuid = 'ad832eae-54b7-4a81-bb49-3125ec77324b';
 
 /// Real BLE service using flutter_blue_plus.
 ///
@@ -83,6 +88,16 @@ class RealBleService implements BleService {
   final NusCommandQueue _nusCmdQueue = NusCommandQueue();
   StreamSubscription<List<int>>? _nusTxSub;
 
+  // -- Debug BLE service (devel firmware) --
+  // ignore: unused_field
+  BluetoothCharacteristic? _debugLogChar;
+  StreamSubscription<List<int>>? _debugSub;
+  final _debugMsgController = StreamController<String>.broadcast();
+  bool _debugServiceAvailable = false;
+
+  @override
+  bool get debugServiceAvailable => _debugServiceAvailable;
+
   // -- Scan state --
   bool _scanning = false;
   StreamSubscription<List<ScanResult>>? _scanSub;
@@ -101,6 +116,9 @@ class RealBleService implements BleService {
 
   @override
   Stream<Telemetry> get telemetry => _telemetryStore.stream;
+
+  @override
+  Stream<String>? get debugMessages => _debugMsgController.stream;
 
   @override
   bool get isScanning => _scanning;
@@ -357,6 +375,31 @@ class RealBleService implements BleService {
       _log.w('WARNING: NUS TX char not found');
     }
 
+    // -- Debug BLE service (devel firmware) --
+    bool foundDebug = false;
+    for (final s in services) {
+      if (s.uuid == Guid(kDebugServiceUuid)) {
+        for (final c in s.characteristics) {
+          if (c.uuid == Guid(kDebugLogCharUuid)) {
+            _debugLogChar = c;
+            foundDebug = true;
+            try {
+              await c.setNotifyValue(true);
+              _debugSub?.cancel();
+              _debugSub = c.onValueReceived.listen((data) {
+                final msg = utf8.decode(data, allowMalformed: true);
+                _debugMsgController.add(msg);
+              });
+              _log.d('Debug BLE service subscribed');
+            } catch (e) {
+              _log.e('Debug BLE subscribe failed: $e', error: e);
+            }
+          }
+        }
+      }
+    }
+    _debugServiceAvailable = foundDebug;
+
     // Set the NUS RX char on the command queue.
     _nusCmdQueue.setNusRxChar(_nusRxChar);
 
@@ -401,11 +444,15 @@ class RealBleService implements BleService {
     _nusTxChar = null;
     _nusRxChar = null;
     _ctsHrChar = null;
+    _debugLogChar = null;
+    _debugServiceAvailable = false;
     _telemetryStore.invalidateOrd();
     _ctsSub?.cancel();
     _ctsSub = null;
     _nusTxSub?.cancel();
     _nusTxSub = null;
+    _debugSub?.cancel();
+    _debugSub = null;
     _dashConnEventSub?.cancel();
     _dashConnEventSub = null;
     _nusCmdQueue.cancelAll();
