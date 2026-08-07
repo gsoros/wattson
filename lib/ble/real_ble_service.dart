@@ -388,6 +388,7 @@ class RealBleService implements BleService {
               _debugSub?.cancel();
               _debugSub = c.onValueReceived.listen((data) {
                 final msg = utf8.decode(data, allowMalformed: true);
+                _log.d('Debug BLE: $msg');
                 _debugMsgController.add(msg);
               });
               _log.d('Debug BLE service subscribed');

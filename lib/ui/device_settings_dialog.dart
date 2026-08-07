@@ -530,7 +530,9 @@ class _DebugLogCard extends ConsumerWidget {
                     icon: const Icon(Icons.save_alt, size: 16),
                     label: const Text('Save to log'),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debug log saved to wattson.log')));
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(const SnackBar(content: Text('Debug log saved to wattson.log'), duration: Duration(seconds: 1)));
                     },
                   ),
                   const SizedBox(width: 8),
@@ -538,7 +540,7 @@ class _DebugLogCard extends ConsumerWidget {
                     icon: const Icon(Icons.delete_outline, size: 16),
                     label: const Text('Clear buffer'),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debug buffer cleared')));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debug buffer cleared'), duration: Duration(seconds: 1)));
                     },
                   ),
                 ],
@@ -583,11 +585,13 @@ class _TorqueDumpCard extends ConsumerWidget {
                   final log = AppLog.logFor('TorqueDump');
                   log.i('--- Torque log dump ---\n${reply.data}');
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Torque log saved to wattson.log')));
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('Torque log saved to wattson.log'), duration: Duration(seconds: 1)));
                   }
                 } else {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to dump torque log')));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to dump torque log'), duration: Duration(seconds: 1)));
                   }
                 }
               },
