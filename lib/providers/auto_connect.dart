@@ -50,7 +50,7 @@ class AutoConnectManager {
 
     // Both slots already connected — no need to scan.
     if (_service.dashConnected && _service.hrmConnected) {
-      _log.d('both slots connected, skipping scan');
+      // _log.d('both slots connected, skipping scan');
       return;
     }
 
@@ -59,7 +59,7 @@ class AutoConnectManager {
       return;
     }
 
-    _log.d('starting scan for stored devices...');
+    // _log.d('starting scan for stored devices...');
     await _service.startScan();
 
     // Give the scan a moment to find devices, then connect.

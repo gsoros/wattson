@@ -89,8 +89,6 @@ class RealBleService implements BleService {
   StreamSubscription<List<int>>? _nusTxSub;
 
   // -- Debug BLE service (devel firmware) --
-  // ignore: unused_field
-  BluetoothCharacteristic? _debugLogChar;
   StreamSubscription<List<int>>? _debugSub;
   final _debugMsgController = StreamController<String>.broadcast();
   bool _debugServiceAvailable = false;
@@ -157,7 +155,7 @@ class RealBleService implements BleService {
     }
 
     _scanning = true;
-    _log.d('startScan: starting scan');
+    // _log.d('startScan: starting scan');
 
     // Subscribe to results before startScan.
     _scanSub?.cancel();
@@ -184,7 +182,7 @@ class RealBleService implements BleService {
   @override
   Future<void> stopScan() async {
     if (!_scanning) return;
-    _log.d('stopScan');
+    // _log.d('stopScan');
     _scanning = false;
     _scanCancelTimer?.cancel();
     _scanCancelTimer = null;
@@ -381,14 +379,14 @@ class RealBleService implements BleService {
       if (s.uuid == Guid(kDebugServiceUuid)) {
         for (final c in s.characteristics) {
           if (c.uuid == Guid(kDebugLogCharUuid)) {
-            _debugLogChar = c;
             foundDebug = true;
             try {
               await c.setNotifyValue(true);
               _debugSub?.cancel();
               _debugSub = c.onValueReceived.listen((data) {
-                final msg = utf8.decode(data, allowMalformed: true);
-                _log.d('Debug BLE: $msg');
+                // strip trailing newlines
+                final msg = utf8.decode(data, allowMalformed: true).replaceAll(RegExp(r'\n$', dotAll: true), '');
+                _log.d('[D.BLE] $msg');
                 _debugMsgController.add(msg);
               });
               _log.d('Debug BLE service subscribed');
@@ -445,7 +443,6 @@ class RealBleService implements BleService {
     _nusTxChar = null;
     _nusRxChar = null;
     _ctsHrChar = null;
-    _debugLogChar = null;
     _debugServiceAvailable = false;
     _telemetryStore.invalidateOrd();
     _ctsSub?.cancel();

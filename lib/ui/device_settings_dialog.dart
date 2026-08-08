@@ -391,12 +391,12 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
                     onChanged: (on) => _toggleSim(on),
                   ),
                 // -- Debug section (devel firmware) --
-                const SizedBox(height: 24),
-                Text('Debug', style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 8),
-                _DebugLogCard(),
-                const SizedBox(height: 8),
-                _TorqueDumpCard(),
+                // const SizedBox(height: 24),
+                // Text('Debug', style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                // const SizedBox(height: 8),
+                // _DebugLogCard(),
+                // const SizedBox(height: 8),
+                // _TorqueDumpCard(),
               ],
             ),
           ),
@@ -493,6 +493,7 @@ class _DeviceSettingsDialogState extends ConsumerState<DeviceSettingsDialog> {
 // ---------------------------------------------------------------------------
 
 /// Card showing debug log message count and save/clear buttons.
+/// ignore: unused_element
 class _DebugLogCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -554,6 +555,7 @@ class _DebugLogCard extends ConsumerWidget {
 }
 
 /// Card with a button to dump the torque ring buffer via NUS.
+/// ignore: unused_element
 class _TorqueDumpCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
