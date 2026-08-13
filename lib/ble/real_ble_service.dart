@@ -66,7 +66,7 @@ class RealBleService implements BleService {
   bool get dashConnected => _dashConnected;
   @override
   set dashConnected(bool value) {
-    _log.d('dashConnected: $value');
+    //_log.d('dashConnected: $value');
     _dashConnected = value;
   }
 
@@ -134,7 +134,7 @@ class RealBleService implements BleService {
   Future<void> startScan() async {
     if (_disposed) return;
     if (_scanning) {
-      _log.d('startScan: already scanning');
+      //_log.d('startScan: already scanning');
       return;
     }
 
@@ -269,7 +269,7 @@ class RealBleService implements BleService {
     _dashDevice = device;
     _connectingIds.add(deviceId);
     _dashStateController.add(BleConnectionState.connecting);
-    _log.d('connectToDash: found ${device.remoteId}');
+    //_log.d('connectToDash: found ${device.remoteId}');
 
     // Persist the MAC and name.
     final prefs = await SharedPreferences.getInstance();
@@ -280,7 +280,7 @@ class RealBleService implements BleService {
     _dashConnEventSub?.cancel();
     _dashConnEventSub = FlutterBluePlus.events.onConnectionStateChanged.listen((event) {
       if (event.device.remoteId == device.remoteId && event.connectionState == BluetoothConnectionState.disconnected) {
-        _log.d('Dash disconnected');
+        //_log.d('Dash disconnected');
         dashConnected = false;
         _connectingIds.remove(deviceId);
         _dashStateController.add(BleConnectionState.disconnected);
@@ -291,9 +291,9 @@ class RealBleService implements BleService {
     // Connect.
     try {
       await device.connect(license: License.nonprofit, mtu: 247);
-      _log.d('Dash connected');
+      //_log.d('Dash connected');
     } catch (e) {
-      _log.e('Dash connect failed: $e', error: e);
+      //_log.e('Dash connect failed: $e', error: e);
       _connectingIds.remove(deviceId);
       _dashStateController.add(BleConnectionState.disconnected);
       return;

@@ -26,7 +26,7 @@ import 'package:share_plus/share_plus.dart';
 class AppLog {
   AppLog._();
 
-  static const int _maxBytes = 1024 * 1024; // Rotate at 1 MB.
+  static const int _maxBytes = 1024 * 1024 * 10; // TODO: Rotate at 10 MB.
   static File? _file;
   static late final AppLogFileOutput _fileOutput;
   static final Map<String, Logger> _loggers = {};

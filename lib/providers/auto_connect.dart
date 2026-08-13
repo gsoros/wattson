@@ -55,7 +55,7 @@ class AutoConnectManager {
     }
 
     if (_service.isScanning) {
-      _log.d('already scanning');
+      //_log.d('already scanning');
       return;
     }
 
