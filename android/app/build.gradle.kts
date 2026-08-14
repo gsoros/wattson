@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "org.gsoros.wattson"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37 // flutter.compileSdkVersion = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

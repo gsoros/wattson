@@ -40,7 +40,11 @@ dependencies:
   # Location / GPS
   geolocator: ^14.0.3
   # Foreground service for background ride recording
-  flutter_foreground_task: ^10.0.0
+  #flutter_foreground_task: ^10.0.0
+  flutter_foreground_task:
+    git:
+      url: https://github.com/Dev-hwang/flutter_foreground_task.git
+      ref: master
   # Local storage (SQLite, WAL)
   drift: ^2.22.0
   sqlite3_flutter_libs: ^0.6.0+eol
@@ -49,7 +53,7 @@ dependencies:
   # State management
   flutter_riverpod: ^3.3.2
   # Permissions
-  permission_handler: ^12.0.3
+  permission_handler: ^13.0.1
   # Persistent key-value storage
   shared_preferences: ^2.5.0
   # OS share sheet (export)
