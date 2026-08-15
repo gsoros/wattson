@@ -66,11 +66,11 @@ class AutoConnectManager {
     await Future.delayed(const Duration(seconds: 3));
 
     if (dashMac != null && !_service.dashConnected) {
-      _log.d('connecting to Dash: $dashName ($dashMac)');
+      //_log.d('connecting to Dash: $dashName ($dashMac)');
       await _service.connectToDash(dashMac, name: dashName);
     }
     if (hrmMac != null && !_service.hrmConnected) {
-      _log.d('connecting to HRM: $hrmMac');
+      //_log.d('connecting to HRM: $hrmMac');
       await _service.connectToHrm(hrmMac, name: hrmName);
     }
   }

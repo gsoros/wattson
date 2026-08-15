@@ -80,7 +80,7 @@ class RealBleService implements BleService {
   bool get hrmConnected => _hrmConnected;
   @override
   set hrmConnected(bool value) {
-    _log.d('hrmConnected: $value');
+    //_log.d('hrmConnected: $value');
     _hrmConnected = value;
   }
 
@@ -481,7 +481,7 @@ class RealBleService implements BleService {
     _hrmDevice = device;
     _connectingIds.add(deviceId);
     _hrmStateController.add(BleConnectionState.connecting);
-    _log.d('connectToHrm: found ${device.remoteId}');
+    //_log.d('connectToHrm: found ${device.remoteId}');
 
     // Persist the MAC and name.
     final prefs = await SharedPreferences.getInstance();
@@ -492,7 +492,7 @@ class RealBleService implements BleService {
     _hrmConnEventSub?.cancel();
     _hrmConnEventSub = FlutterBluePlus.events.onConnectionStateChanged.listen((event) {
       if (event.device.remoteId == device.remoteId && event.connectionState == BluetoothConnectionState.disconnected) {
-        _log.d('HRM disconnected');
+        //_log.d('HRM disconnected');
         hrmConnected = false;
         _connectingIds.remove(deviceId);
         _hrmStateController.add(BleConnectionState.disconnected);
@@ -504,7 +504,7 @@ class RealBleService implements BleService {
     try {
       _connectingIds.add(deviceId);
       await device.connect(license: License.nonprofit);
-      _log.d('HRM connected');
+      //_log.d('HRM connected');
     } catch (e) {
       _log.e('HRM connect failed: $e', error: e);
       _connectingIds.remove(deviceId);
